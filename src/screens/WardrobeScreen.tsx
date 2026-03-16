@@ -1,20 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Alert, Image, FlatList, Modal } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Alert, Image, FlatList, Modal, RefreshControl, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker'; 
 import { ClothingItem } from '../types';
 
+// Filtre Kategorilerimiz
+const CATEGORIES = ['Tümü', 'Üst Giyim', 'Alt Giyim', 'Dış Giyim', 'Ayakkabı', 'Aksesuar'];
+
 export default function WardrobeScreen() {
   const [wardrobeItems, setWardrobeItems] = useState<ClothingItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false); // Aşağı çekerek yenileme state'i
   const [selectedItem, setSelectedItem] = useState<ClothingItem | null>(null);
+  const [activeCategory, setActiveCategory] = useState('Tümü'); // Seçili filtre
 
-  useEffect(() => { fetchWardrobeData(); }, []);
+// Kategori değiştiğinde verileri baştan çek
+  useEffect(() => { 
+    fetchWardrobeData(); 
+  }, [activeCategory]);
 
-  const fetchWardrobeData = async () => {
+const fetchWardrobeData = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://10.87.14.78:8080/api/v1/clothes/3'); 
+      // MİMARİ: Eğer 'Tümü' seçiliyse normal adrese, kategori seçiliyse senin yazdığın Filter endpoint'ine gider!
+      const url = activeCategory === 'Tümü' 
+        ? 'http://10.87.14.78:8080/api/v1/clothes/3'
+        : `http://10.87.14.78:8080/api/v1/clothes/3/filter?category=${activeCategory}`;
+
+      const response = await fetch(url); 
       if (response.ok) {
         const data = await response.json();
         setWardrobeItems(data);
@@ -23,17 +36,24 @@ export default function WardrobeScreen() {
     finally { setIsLoading(false); }
   };
 
-  const pickImageAndUpload = async () => {
+  // Aşağı Çekerek Yenileme Fonksiyonu
+  const onRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchWardrobeData();
+    setIsRefreshing(false);
+  };
+
+const pickImageAndUpload = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [4, 3], quality: 0.7 });
     if (!result.canceled) await uploadToBackend(result.assets[0].uri);
   };
 
-  const uploadToBackend = async (uri: string) => {
+const uploadToBackend = async (uri: string) => {
     setIsLoading(true);
     try {
       const formData = new FormData();
       formData.append('image', { uri: uri, name: 'yeni_kiyafet.jpg', type: 'image/jpeg' } as any);
-      const clothingData = { name: "Yeni Eklenen Parça", category: "Üst Giyim", season: "Bahar", color: "Siyah" };
+      const clothingData = { name: "Yeni Eklenen Parça", category: activeCategory !== 'Tümü' ? activeCategory : "Üst Giyim", season: "Bahar", color: "Siyah" };
       formData.append('data', JSON.stringify(clothingData));
 
       const response = await fetch('http://10.87.14.78:8080/api/v1/clothes/3', { method: 'POST', body: formData });
@@ -43,7 +63,7 @@ export default function WardrobeScreen() {
     finally { setIsLoading(false); }
   };
 
-  const renderClothingCard = ({ item }: { item: ClothingItem }) => (
+const renderClothingCard = ({ item }: { item: ClothingItem }) => (
     <TouchableOpacity style={styles.card} activeOpacity={0.8} onPress={() => setSelectedItem(item)}>
       <Image source={{ uri: item.imageUrl || 'https://via.placeholder.com/150' }} style={styles.cardImage} resizeMode="contain" />
       <View style={styles.cardInfo}>
@@ -53,16 +73,43 @@ export default function WardrobeScreen() {
     </TouchableOpacity>
   );
 
-  return (
+return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Dolabım</Text>
         <TouchableOpacity style={styles.addButton} onPress={pickImageAndUpload}><Text style={styles.addButtonText}>+ Ekle</Text></TouchableOpacity>
       </View>
+
+      {/* AKILLI FİLTRELEME ÇUBUĞU (Yatay Kaydırılabilir) */}
+      <View style={styles.filterContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+          {CATEGORIES.map((cat, index) => (
+            <TouchableOpacity 
+              key={index} 
+              style={[styles.filterPill, activeCategory === cat && styles.filterPillActive]}
+              onPress={() => setActiveCategory(cat)}
+            >
+              <Text style={[styles.filterText, activeCategory === cat && styles.filterTextActive]}>{cat}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
       
-      {isLoading && <ActivityIndicator size="large" color="#2C3E50" style={{ marginVertical: 20 }} />}
+      {isLoading && !isRefreshing && <ActivityIndicator size="large" color="#2C3E50" style={{ marginVertical: 20 }} />}
       
-      <FlatList data={wardrobeItems} keyExtractor={(item) => item.id.toString()} renderItem={renderClothingCard} numColumns={2} contentContainerStyle={styles.listContainer} showsVerticalScrollIndicator={false} ListEmptyComponent={!isLoading ? <Text style={styles.emptyText}>Dolabın boş. Fotoğraf ekle!</Text> : null} />
+      <FlatList 
+        data={wardrobeItems} 
+        keyExtractor={(item) => item.id.toString()} 
+        renderItem={renderClothingCard} 
+        numColumns={2} 
+        contentContainerStyle={styles.listContainer} 
+        showsVerticalScrollIndicator={false} 
+        ListEmptyComponent={!isLoading ? <Text style={styles.emptyText}>Bu kategoride kıyafet yok.</Text> : null} 
+        // AŞAĞI ÇEKEREK YENİLEME SİGORTASI
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} colors={['#2C3E50']} tintColor="#2C3E50" />
+        }
+      />
 
       <Modal visible={selectedItem !== null} animationType="slide" presentationStyle="pageSheet">
         <View style={styles.detailContainer}>
@@ -99,10 +146,20 @@ export default function WardrobeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8F9FA', paddingTop: 50 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 15 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 10 },
   title: { fontSize: 28, fontWeight: '800', color: '#2C3E50' },
   addButton: { backgroundColor: '#2C3E50', paddingVertical: 10, paddingHorizontal: 15, borderRadius: 20 },
   addButtonText: { color: 'white', fontWeight: 'bold' },
+
+  // Filtre Tasarımları
+  filterContainer: { height: 50, marginBottom: 10 },
+  filterScroll: { paddingHorizontal: 15, alignItems: 'center' },
+  filterPill: { paddingHorizontal: 20, paddingVertical: 8, backgroundColor: '#FFFFFF', borderRadius: 25, marginRight: 10, borderWidth: 1, borderColor: '#E5E8E8' },
+  filterPillActive: { backgroundColor: '#2C3E50', borderColor: '#2C3E50' },
+  filterText: { color: '#7F8C8D', fontWeight: '600', fontSize: 14 },
+  filterTextActive: { color: '#FFFFFF', fontWeight: 'bold' },
+
+
   listContainer: { paddingHorizontal: 10, paddingBottom: 20 },
   emptyText: { textAlign: 'center', marginTop: 50, fontSize: 16, color: '#7F8C8D' },
   card: { flex: 1, backgroundColor: '#FFFFFF', margin: 8, borderRadius: 15, padding: 10, alignItems: 'center', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
@@ -110,6 +167,7 @@ const styles = StyleSheet.create({
   cardInfo: { width: '100%', alignItems: 'center' },
   cardName: { fontSize: 14, fontWeight: '700', color: '#34495E', marginBottom: 4, textAlign: 'center' },
   cardCategory: { fontSize: 12, color: '#95A5A6' },
+
   detailContainer: { flex: 1, backgroundColor: '#FAFAFA', paddingHorizontal: 20, paddingTop: 20 },
   detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 15 },
   detailTitle: { fontSize: 16, fontWeight: 'bold', color: '#7F8C8D', letterSpacing: 2 },

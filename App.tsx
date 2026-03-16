@@ -9,6 +9,8 @@ import StylistScreen from './src/screens/StylistScreen';
 import SocialScreen from './src/screens/SocialScreen';
 import AnalyticsScreen from './src/screens/AnalyticsScreen';
 
+// npx expo start -c  -> İle çalıştırıyoruz.
+
 const Tab = createBottomTabNavigator();
 
 export default function App() {

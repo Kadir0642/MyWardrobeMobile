@@ -43,6 +43,19 @@ export default function StylistScreen() {
 
   return (
     <View style={styles.stylistContainer}>
+      
+      <View style={styles.weatherHeader}>
+        <View style={styles.dateBox}>
+          <Ionicons name="calendar-outline" size={20} color="#7F8C8D" />
+          <Text style={styles.dateText}>16 Mart Pazartesi</Text>
+        </View>
+        <View style={styles.weatherBox}>
+          <Text style={styles.weatherTemp}>18°C</Text>
+          <Ionicons name="partly-sunny" size={24} color="#F39C12" />
+          <Text style={styles.weatherCity}>İstanbul</Text>
+        </View>
+      </View>
+
       <Text style={styles.stylistTitle}>Günün Önerisi ✨</Text>
       
       {isLoading ? (
@@ -99,4 +112,12 @@ const styles = StyleSheet.create({
   reasonText: { fontSize: 16, fontWeight: '600', color: '#34495E' },
   cancelSheetButton: { marginTop: 10, padding: 10 },
   cancelSheetText: { fontSize: 16, fontWeight: 'bold', color: '#E74C3C' },
+  
+  // Hava Durumu Başlığı Stilleri
+  weatherHeader: { flexDirection: 'row', justifyContent: 'space-between', width: '90%', backgroundColor: '#FFFFFF', padding: 15, borderRadius: 15, marginBottom: 20, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5 },
+  dateBox: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  dateText: { fontSize: 14, fontWeight: '600', color: '#34495E' },
+  weatherBox: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  weatherTemp: { fontSize: 16, fontWeight: 'bold', color: '#2C3E50' },
+  weatherCity: { fontSize: 12, color: '#7F8C8D' },
 });
