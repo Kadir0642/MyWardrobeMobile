@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Alert, Image, FlatList } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Alert, Image, FlatList,Animated, PanResponder, Modal } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import * as ImagePicker from 'expo-image-picker';
+import * as ImagePicker from 'expo-image-picker'; 
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons'; // Expo'nun içindeki devasa ikon kütüphanesi
@@ -17,11 +17,53 @@ interface ClothingItem {
 }
 
 // ------------------------------------------------------------------
-// 1. EKRAN: DOLABIM (Indyx Tarzı Premium Vitrin)
+// SÜRÜKLENEBİLİR KIYAFET BİLEŞENİ (Fizik Motoru)
+// ------------------------------------------------------------------
+const DraggableItem = ({ item, initialX, initialY, zIndex = 1 }: { item: ClothingItem, initialX: number, initialY: number, zIndex?: number }) => {
+  const pan = useRef(new Animated.ValueXY({ x: initialX, y: initialY })).current;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        // Dokunulduğunda mevcut konumu hafızaya al
+        pan.setOffset({ x: (pan.x as any)._value, y: (pan.y as any)._value });
+        pan.setValue({ x: 0, y: 0 });
+      },
+      onPanResponderMove: Animated.event(
+        [null, { dx: pan.x, dy: pan.y }],
+        { useNativeDriver: false }
+      ),
+      onPanResponderRelease: () => {
+        // Parmağı çekince konumu sabitle
+        pan.flattenOffset();
+        // NOT: İleride bu X ve Y koordinatlarını Java backend'e gönderip,
+        // kullanıcıların hangi kıyafeti nereye koyduğunu (Örn: şapkayı en üste) AI dataset'i için kaydedeceğiz!
+      },
+    })
+  ).current;
+
+  return (
+    <Animated.View
+      style={[
+        pan.getLayout(),
+        styles.draggableItem,
+        { zIndex: zIndex } // Hangi eşyanın üstte duracağını belirler (Örn: Ceket tişörtün üstünde)
+      ]}
+      {...panResponder.panHandlers}
+    >
+      <Image source={{ uri: item.imageUrl }} style={styles.draggableImage} resizeMode="contain" />
+    </Animated.View>
+  );
+};
+
+// ------------------------------------------------------------------
+// 1. EKRAN: DOLABIM (Indyx Tarzı Premium Vitrin ve Detay Paneli)
 // ------------------------------------------------------------------
 function WardrobeScreen() {
   const [wardrobeItems, setWardrobeItems] = useState<ClothingItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<ClothingItem | null>(null); // Tıklanan kıyafeti hafızada tutar
 
   useEffect(() => {
     fetchWardrobeData();
@@ -30,12 +72,8 @@ function WardrobeScreen() {
   const fetchWardrobeData = async () => {
     setIsLoading(true);
     try {
-
-       //" npx expo start -c   "ile çalışıyor 
-      // DİKKAT:CloudflareWARP değil altındaki yerdeki IPv4 Address kısmında
-      //  172 veya 198 neyse o adres ile başlayan kendi IP adresini buraya yaz!
-      // Sondaki /1 kısmı, ID'si 1 olan kullanıcının kıyafetlerini getirir. 
-      const response = await fetch('http://10.87.14.78:8080/api/v1/clothes/3');
+      // KENDİ IP ADRESİNİ YAZ:
+      const response = await fetch('http://10.87.14.78:8080/api/v1/clothes/3'); 
       if (response.ok) {
         const data = await response.json();
         setWardrobeItems(data);
@@ -93,14 +131,15 @@ function WardrobeScreen() {
     }
   };
 
+  // VİTRİN KARTLARI (Artık tıklanabilir - TouchableOpacity eklendi)
   const renderClothingCard = ({ item }: { item: ClothingItem }) => (
-    <View style={styles.card}>
+    <TouchableOpacity style={styles.card} activeOpacity={0.8} onPress={() => setSelectedItem(item)}>
       <Image source={{ uri: item.imageUrl || 'https://via.placeholder.com/150' }} style={styles.cardImage} resizeMode="contain" />
       <View style={styles.cardInfo}>
         <Text style={styles.cardName}>{item.name}</Text>
         <Text style={styles.cardCategory}>{item.category} • {item.season}</Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   return (
@@ -111,7 +150,9 @@ function WardrobeScreen() {
           <Text style={styles.addButtonText}>+ Ekle</Text>
         </TouchableOpacity>
       </View>
+      
       {isLoading && <ActivityIndicator size="large" color="#2C3E50" style={{ marginVertical: 20 }} />}
+      
       <FlatList
         data={wardrobeItems}
         keyExtractor={(item) => item.id.toString()}
@@ -121,19 +162,182 @@ function WardrobeScreen() {
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={!isLoading ? <Text style={styles.emptyText}>Dolabın şu an boş. Hemen bir fotoğraf ekle!</Text> : null}
       />
+
+      {/* DEVASA KIYAFET DETAY PANELİ (Indyx Tarzı) */}
+      <Modal visible={selectedItem !== null} animationType="slide" presentationStyle="pageSheet">
+        <View style={styles.detailContainer}>
+          
+          {/* Üst Bar: Geri ve Sil Butonları */}
+          <View style={styles.detailHeader}>
+            <TouchableOpacity onPress={() => setSelectedItem(null)}>
+              <Ionicons name="arrow-back" size={28} color="#2C3E50" />
+            </TouchableOpacity>
+            <Text style={styles.detailTitle}>PARÇA DETAYI</Text>
+            <TouchableOpacity onPress={() => { Alert.alert("Sil", "Bu kıyafeti dolaptan silmek istediğine emin misin?"); }}>
+              <Ionicons name="trash-outline" size={26} color="#E74C3C" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Dev Kıyafet Fotoğrafı */}
+          <View style={styles.detailImageContainer}>
+            <Image source={{ uri: selectedItem?.imageUrl }} style={styles.detailImage} resizeMode="contain" />
+          </View>
+
+          {/* Analiz ve Özellikler (Maliyet, Giyilme Sayısı vs.) */}
+          <View style={styles.analyticsBox}>
+            <View style={styles.analyticItem}>
+              <Text style={styles.analyticValue}>12</Text>
+              <Text style={styles.analyticLabel}>Kez Giyildi</Text>
+            </View>
+            <View style={styles.analyticItem}>
+              <Text style={styles.analyticValue}>850₺</Text>
+              <Text style={styles.analyticLabel}>Fiyat</Text>
+            </View>
+            <View style={styles.analyticItem}>
+              <Text style={[styles.analyticValue, {color: '#27AE60'}]}>70₺</Text>
+              <Text style={styles.analyticLabel}>CPW (Maliyet)</Text>
+            </View>
+          </View>
+
+          {/* Sezon Seçimi Toggles */}
+          <Text style={styles.sectionTitle}>SEZON</Text>
+          <View style={styles.seasonGrid}>
+            <TouchableOpacity style={[styles.seasonButton, styles.seasonActive]}><Text style={styles.seasonTextActive}>İlkbahar</Text></TouchableOpacity>
+            <TouchableOpacity style={[styles.seasonButton, styles.seasonActive]}><Text style={styles.seasonTextActive}>Yaz</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.seasonButton}><Text style={styles.seasonText}>Sonbahar</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.seasonButton}><Text style={styles.seasonText}>Kış</Text></TouchableOpacity>
+          </View>
+
+          {/* Görünürlük Ayarları */}
+          <Text style={styles.sectionTitle}>GÖRÜNÜRLÜK (VISIBILITY)</Text>
+          <View style={styles.seasonGrid}>
+            <TouchableOpacity style={styles.visibilityButton}><Text style={styles.visibilityText}>Gizli (Private)</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.visibilityButton}><Text style={styles.visibilityText}>Favori 🌟</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.visibilityButton}><Text style={styles.visibilityText}>Kombinleme (Do Not Style)</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.visibilityButton}><Text style={styles.visibilityText}>Arşivle</Text></TouchableOpacity>
+          </View>
+
+        </View>
+      </Modal>
+
     </View>
   );
 }
 
 // ------------------------------------------------------------------
-// 2. EKRAN: STİLİST (Whering Tarzı Kombin Tuvali)
+// 2. EKRAN: AI STİLİST (Mikro-Geri Bildirim ve RL Dataset)
 // ------------------------------------------------------------------
 function StylistScreen() {
+  const [currentOutfit, setCurrentOutfit] = useState<ClothingItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFeedbackVisible, setIsFeedbackVisible] = useState(false); // Alttan çıkan menünün kontrolü
+
+  useEffect(() => {
+    fetchAIRecomeendation();
+  }, []);
+
+  const fetchAIRecomeendation = async () => {
+    setIsLoading(true);
+    try {
+      // KENDİ IP ADRESİNİ YAZMAYI UNUTMA
+      const response = await fetch('http://10.87.14.78:8080/api/v1/clothes/3');
+      if (response.ok) {
+        const data: ClothingItem[] = await response.json();
+        setCurrentOutfit(data.slice(0, 3)); 
+      }
+    } catch (error) {
+      console.error("AI Bağlantı Hatası:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // KOMBİN BEĞENİLDİĞİNDE
+  const handleLike = () => {
+    console.log("Kombin BEĞENİLDİ ❤️ - Positive Reward AI'a gönderiliyor...");
+    Alert.alert("Harika!", "Bu kombini günün kombini (OOTD) olarak kaydettik.");
+    fetchAIRecomeendation();
+  };
+
+  // NEDEN BEĞENİLMEDİ? (Dataset'i Besleyen Ana Fonksiyon)
+  const submitFeedback = (reason: string) => {
+    setIsFeedbackVisible(false); // Menüyü kapat
+    
+    // İLERİDE: Bu JSON verisi doğrudan Java Backend'ine ve oradan Python RL Modelimize gidecek
+    const feedbackData = {
+      outfitId: "temp_outfit_123",
+      action: "REJECT",
+      reason: reason // Örn: "Renkler Uyumsuz"
+    };
+    
+    console.log("AI Modelini Eğitmek İçin Gönderilen Veri:", JSON.stringify(feedbackData));
+    
+    // Geri bildirim alındıktan sonra yeni kombin getir
+    fetchAIRecomeendation();
+  };
+
   return (
-    <View style={styles.centerContainer}>
-      <Ionicons name="shirt-outline" size={80} color="#3498DB" />
-      <Text style={styles.comingSoonTitle}>Kombin Tuvali</Text>
-      <Text style={styles.comingSoonText}>Whering tarzı kaydırmalı kombin ekranı buraya gelecek. AI ile akıllı eşleştirmeler çok yakında!</Text>
+    <View style={styles.stylistContainer}>
+      <Text style={styles.stylistTitle}>Günün Önerisi ✨</Text>
+      
+      {isLoading ? (
+        <ActivityIndicator size="large" color="#3498DB" style={{ marginTop: 100 }} />
+      ) : (
+        <>
+          <View style={styles.outfitCanvas}>
+            {currentOutfit.map((item, index) => {
+              const startX = 100; 
+              const startY = index * 120; 
+              return (
+                <DraggableItem key={item.id} item={item} initialX={startX} initialY={startY} zIndex={10 - index} />
+              );
+            })}
+          </View>
+
+          <View style={styles.feedbackContainer}>
+            {/* Çarpıya basınca artık direkt geçmiyor, menüyü açıyor */}
+            <TouchableOpacity style={styles.dislikeButton} onPress={() => setIsFeedbackVisible(true)}>
+              <Ionicons name="close" size={40} color="#E74C3C" />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.likeButton} onPress={handleLike}>
+              <Ionicons name="heart" size={40} color="#2ECC71" />
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
+
+      {/* ALTTAN AÇILAN ZEKİ GERİ BİLDİRİM MENÜSÜ (Bottom Sheet) */}
+      <Modal visible={isFeedbackVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.bottomSheet}>
+            <Text style={styles.sheetTitle}>Bu kombinde neyi sevmedin?</Text>
+            <Text style={styles.sheetSubtitle}>Bunu bilmek tarzını daha iyi öğrenmemi sağlayacak.</Text>
+
+            <TouchableOpacity style={styles.reasonButton} onPress={() => submitFeedback("Renkler Uyumsuz")}>
+              <Text style={styles.reasonText}>🎨 Renkler birbirine uymadı</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.reasonButton} onPress={() => submitFeedback("Hava Durumuna Ters")}>
+              <Text style={styles.reasonText}>🌤️ Hava durumuna uygun değil</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.reasonButton} onPress={() => submitFeedback("Tarzım Değil")}>
+              <Text style={styles.reasonText}>👗 Benim tarzım değil</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.reasonButton} onPress={() => submitFeedback("Aynı Parçalar")}>
+              <Text style={styles.reasonText}>🔄 Bunları hep giyiyorum</Text>
+            </TouchableOpacity>
+
+            {/* İptal Butonu */}
+            <TouchableOpacity style={styles.cancelSheetButton} onPress={() => setIsFeedbackVisible(false)}>
+              <Text style={styles.cancelSheetText}>Vazgeç</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
@@ -204,8 +408,8 @@ tabBarIcon: ({ focused, color, size }) => {
           },
           headerShown: false, // Üstteki varsayılan çirkin başlığı gizler
         })}
-      >
-        <Tab.Screen name="Vitrin" component={WardrobeScreen} />
+      > 
+        <Tab.Screen name="Vitrin" component={WardrobeScreen} /> 
         <Tab.Screen name="Kombin" component={StylistScreen} />
         <Tab.Screen name="Sosyal" component={SocialScreen} />
         <Tab.Screen name="Analiz" component={AnalyticsScreen} />
@@ -237,4 +441,86 @@ const styles = StyleSheet.create({
   cardCategory: { fontSize: 12, color: '#95A5A6' },
   comingSoonTitle: { fontSize: 24, fontWeight: 'bold', color: '#2C3E50', marginTop: 20, marginBottom: 10 },
   comingSoonText: { fontSize: 16, color: '#7F8C8D', textAlign: 'center', paddingHorizontal: 20, lineHeight: 24 },
+
+  // Kombin Tuvali Tasarımları
+  stylistContainer: { flex: 1, backgroundColor: '#F8F9FA', paddingTop: 50, alignItems: 'center' },
+  stylistTitle: { fontSize: 26, fontWeight: '800', color: '#2C3E50' },
+  stylistSubtitle: { fontSize: 14, color: '#7F8C8D', marginBottom: 30 },
+  canvas: { flex: 1, width: '100%', justifyContent: 'center', alignItems: 'center' },
+  
+  // Karusel (Kaydırma Bantları) Kutusu
+  carouselWrapper: { 
+    height: 250, 
+    width: 250, 
+    backgroundColor: '#FFFFFF', 
+    borderRadius: 20, 
+    marginVertical: 10, 
+    elevation: 8, // Android gölgesi
+    shadowColor: '#000', // iOS gölgesi
+    shadowOpacity: 0.15, 
+    shadowRadius: 10, 
+    overflow: 'hidden', // Resimlerin kutudan taşmasını engeller
+    justifyContent: 'center'
+  },
+  carouselItem: { width: 250, height: 250, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  carouselImage: { width: '100%', height: '100%' },
+
+  // AI Stilist Ekranı Tasarımları
+  outfitCanvas: { 
+    flex: 1, 
+    width: '90%', 
+    backgroundColor: '#FFFFFF', 
+    borderRadius: 20, 
+    marginVertical: 20,
+    elevation: 3, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 5,
+    position: 'relative', // İçindeki parçaların serbest gezmesi için şart
+    overflow: 'hidden'
+  },
+  draggableItem: { position: 'absolute', padding: 10 },
+  draggableImage: { width: 140, height: 140 }, // Kıyafetlerin tuvaldeki boyutu
+  feedbackContainer: { flexDirection: 'row', justifyContent: 'space-evenly', width: '100%', paddingBottom: 20 },
+  likeButton: { backgroundColor: '#EAFAF1', padding: 15, borderRadius: 40, elevation: 2 },
+  dislikeButton: { backgroundColor: '#FDEDEC', padding: 15, borderRadius: 40, elevation: 2 },
+
+  // Zeki Geri Bildirim Menüsü (Bottom Sheet) Tasarımları
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  bottomSheet: { 
+    backgroundColor: '#FFFFFF', 
+    borderTopLeftRadius: 30, 
+    borderTopRightRadius: 30, 
+    padding: 25, 
+    alignItems: 'center',
+    elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.2, shadowRadius: 10
+  },
+  sheetTitle: { fontSize: 20, fontWeight: '800', color: '#2C3E50', marginBottom: 5 },
+  sheetSubtitle: { fontSize: 14, color: '#7F8C8D', marginBottom: 20, textAlign: 'center' },
+  reasonButton: { 
+    width: '100%', backgroundColor: '#F8F9FA', paddingVertical: 15, paddingHorizontal: 20, 
+    borderRadius: 15, marginBottom: 10, borderWidth: 1, borderColor: '#E5E8E8'
+  },
+  reasonText: { fontSize: 16, fontWeight: '600', color: '#34495E' },
+  cancelSheetButton: { marginTop: 10, padding: 10 },
+  cancelSheetText: { fontSize: 16, fontWeight: 'bold', color: '#E74C3C' },
+
+  // Kıyafet Detay Paneli Tasarımları (Indyx Tarzı)
+  detailContainer: { flex: 1, backgroundColor: '#FAFAFA', paddingHorizontal: 20, paddingTop: 20 },
+  detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 15 },
+  detailTitle: { fontSize: 16, fontWeight: 'bold', color: '#7F8C8D', letterSpacing: 2 },
+  detailImageContainer: { height: 300, backgroundColor: '#FFFFFF', borderRadius: 20, marginVertical: 15, padding: 20, elevation: 5, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10 },
+  detailImage: { width: '100%', height: '100%' },
+  
+  analyticsBox: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#FFFFFF', padding: 20, borderRadius: 15, marginBottom: 25, borderWidth: 1, borderColor: '#EEEEEE' },
+  analyticItem: { alignItems: 'center' },
+  analyticValue: { fontSize: 22, fontWeight: '900', color: '#2C3E50' },
+  analyticLabel: { fontSize: 12, color: '#95A5A6', marginTop: 5, fontWeight: '600' },
+
+  sectionTitle: { fontSize: 14, fontWeight: 'bold', color: '#95A5A6', marginBottom: 10, letterSpacing: 1 },
+  seasonGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 25 },
+  seasonButton: { width: '48%', paddingVertical: 12, backgroundColor: '#FFFFFF', borderRadius: 10, borderWidth: 1, borderColor: '#DDDDDD', alignItems: 'center', marginBottom: 10 },
+  seasonActive: { backgroundColor: '#2C3E50', borderColor: '#2C3E50' },
+  seasonText: { color: '#7F8C8D', fontWeight: 'bold' },
+  seasonTextActive: { color: '#FFFFFF', fontWeight: 'bold' },
+
+  visibilityButton: { width: '48%', paddingVertical: 12, backgroundColor: '#F8F9FA', borderRadius: 10, borderWidth: 1, borderColor: '#E5E8E8', alignItems: 'center', marginBottom: 10 },
+  visibilityText: { color: '#34495E', fontWeight: '600', fontSize: 13 },
 });
