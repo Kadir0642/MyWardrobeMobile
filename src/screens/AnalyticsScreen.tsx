@@ -96,41 +96,42 @@ export default function AnalyticsScreen() {
   );
 }
 
+// PREMIUM CSS GÜNCELLEMESİ (Minimalist, Dergi Tasarımı)
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA' },
-  header: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 20, backgroundColor: '#FFFFFF', borderBottomLeftRadius: 30, borderBottomRightRadius: 30, elevation: 5, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10 },
-  title: { fontSize: 28, fontWeight: '900', color: '#2C3E50' },
-  subtitle: { fontSize: 14, color: '#7F8C8D', marginTop: 5 },
+  container: { flex: 1, backgroundColor: '#FAF9F6' }, // Sıcak ve premium bir kırık beyaz
+  header: { paddingHorizontal: 25, paddingTop: 60, paddingBottom: 25, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+  title: { fontSize: 26, fontWeight: '900', color: '#1A1A1A', letterSpacing: -0.5 },
+  subtitle: { fontSize: 15, color: '#888888', marginTop: 6 },
   
-  statsRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, marginTop: 20 },
-  statBox: { backgroundColor: '#FFFFFF', width: '30%', paddingVertical: 15, borderRadius: 15, alignItems: 'center', elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5 },
-  statNumber: { fontSize: 24, fontWeight: '900', color: '#E74C3C' },
-  statLabel: { fontSize: 12, color: '#95A5A6', fontWeight: '600', marginTop: 2 },
+  statsRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, marginTop: 25 },
+  statBox: { backgroundColor: '#FFFFFF', width: '31%', paddingVertical: 20, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#EFEFEF' },
+  statNumber: { fontSize: 26, fontWeight: '900', color: '#1A1A1A' },
+  statLabel: { fontSize: 11, color: '#888888', fontWeight: '700', marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 },
 
-  card: { backgroundColor: '#FFFFFF', marginHorizontal: 20, marginTop: 20, borderRadius: 20, padding: 20, elevation: 3, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8 },
-  cardTitle: { fontSize: 14, fontWeight: '800', color: '#95A5A6', letterSpacing: 1.5, marginBottom: 15 },
-  subTitle: { fontSize: 13, fontWeight: '700', color: '#34495E', marginBottom: 8 },
+  card: { backgroundColor: '#FFFFFF', marginHorizontal: 20, marginTop: 25, borderRadius: 16, padding: 25, borderWidth: 1, borderColor: '#EFEFEF' },
+  cardTitle: { fontSize: 12, fontWeight: '800', color: '#A0A0A0', letterSpacing: 1.5, marginBottom: 20 },
+  subTitle: { fontSize: 13, fontWeight: '700', color: '#1A1A1A', marginBottom: 10 },
   
   // Percent Worn UI
-  percentContainer: { alignItems: 'center', justifyContent: 'center', height: 120 },
-  percentIconBackground: { position: 'absolute', opacity: 0.5 },
-  percentFill: { backgroundColor: '#1ABC9C', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 30, zIndex: 2, elevation: 5 },
-  percentText: { color: '#FFFFFF', fontSize: 24, fontWeight: '900' },
-  insightText: { fontSize: 14, color: '#34495E', textAlign: 'center', marginTop: 15, lineHeight: 22 },
-  actionButton: { backgroundColor: '#E74C3C', paddingVertical: 12, borderRadius: 10, marginTop: 15, alignItems: 'center' },
-  actionButtonText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
+  percentContainer: { alignItems: 'center', justifyContent: 'center', height: 100 },
+  percentIconBackground: { position: 'absolute', opacity: 0.2 },
+  percentFill: { backgroundColor: '#7A9E9F', paddingHorizontal: 25, paddingVertical: 12, borderRadius: 30, zIndex: 2 }, // Daha pastel, asil bir yeşil/mavi
+  percentText: { color: '#FFFFFF', fontSize: 22, fontWeight: '800' },
+  insightText: { fontSize: 14, color: '#555555', textAlign: 'center', marginTop: 20, lineHeight: 22 },
+  actionButton: { backgroundColor: '#D9534F', paddingVertical: 14, borderRadius: 8, marginTop: 20, alignItems: 'center' }, // Cladwell kırmızı/kiremit rengi
+  actionButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 13, letterSpacing: 1 },
 
   // Color Palette UI
-  colorRow: { flexDirection: 'row', height: 40, borderRadius: 10, overflow: 'hidden' },
+  colorRow: { flexDirection: 'row', height: 35, borderRadius: 6, overflow: 'hidden' },
   colorBlock: { justifyContent: 'center', alignItems: 'center' },
-  colorText: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' },
-  colorTextDark: { color: '#333333', fontSize: 10, fontWeight: 'bold' },
-  insightTextMini: { fontSize: 12, color: '#7F8C8D', fontStyle: 'italic', marginTop: 10 },
+  colorText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+  colorTextDark: { color: '#1A1A1A', fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+  insightTextMini: { fontSize: 13, color: '#888888', fontStyle: 'italic', marginTop: 15, lineHeight: 20 },
 
   // Heroes UI
   heroesRow: { flexDirection: 'row', justifyContent: 'space-between' },
   heroItem: { width: '48%', alignItems: 'center' },
-  heroImagePlaceholder: { width: '100%', height: 120, backgroundColor: '#F8F9FA', borderRadius: 15, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#EEEEEE', marginBottom: 10 },
-  heroName: { fontSize: 13, fontWeight: '700', color: '#2C3E50', textAlign: 'center' },
-  heroWears: { fontSize: 11, color: '#E74C3C', fontWeight: 'bold', marginTop: 4 },
+  heroImagePlaceholder: { width: '100%', height: 140, backgroundColor: '#F9F9F9', borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+  heroName: { fontSize: 13, fontWeight: '700', color: '#1A1A1A', textAlign: 'center' },
+  heroWears: { fontSize: 11, color: '#D9534F', fontWeight: 'bold', marginTop: 6, letterSpacing: 0.5 },
 });
