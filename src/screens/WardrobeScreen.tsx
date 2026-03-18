@@ -7,11 +7,8 @@ import { useNavigation } from '@react-navigation/native';
 
 const CATEGORIES = ['Tümü', 'Üst Giyim', 'Alt Giyim', 'Dış Giyim', 'Ayakkabı', 'Aksesuar'];
 
-// YENİ: KOMBİNLER İÇİN SAHTE VERİ (Backend'e geçince bunu veritabanından çekeceğiz)
-const MOCK_OUTFITS = [
-  { id: '1', name: 'Gündelik Şıklık', images: ['https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=200', 'https://images.unsplash.com/photo-1542272604-787c3835535d?w=200'] },
-  { id: '2', name: 'Ofis Kombini', images: ['https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=200', 'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=200'] },
-];
+
+
 
 export default function WardrobeScreen() {
   const [activeTab, setActiveTab] = useState<'ITEMS' | 'OUTFITS'>('ITEMS'); // YENİ: Parçalar ve Kombinler arası geçiş
@@ -21,10 +18,47 @@ export default function WardrobeScreen() {
   const [selectedItem, setSelectedItem] = useState<ClothingItem | null>(null);
   const [activeCategory, setActiveCategory] = useState('Tümü');
   const navigation = useNavigation<any>(); // Sekmeler arası geçiş motorumuz
+  // YENİ STATE: Gerçek Kombinleri tutacağımız liste
+  const [outfits, setOutfits] = useState<any[]>([]);
 
+  // useEffect'i GÜNCELLE: Sekme değiştiğinde doğru veriyi çeksin
   useEffect(() => { 
     if (activeTab === 'ITEMS') fetchWardrobeData(); 
+    else if (activeTab === 'OUTFITS') fetchOutfitsData(); // Kombinler sekmesine geçince çalışır
   }, [activeCategory, activeTab]);
+
+  // YENİ: Java'dan kullanıcının (ID: 1) gerçek kombinlerini çeken fonksiyon
+  const fetchOutfitsData = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('http://10.87.14.78:8080/api/v1/outfits/user/3');
+      if (response.ok) {
+        const data = await response.json();
+        setOutfits(data); // Gelen OutfitDto listesini state'e kaydet
+      }
+    } catch (error) { console.error("Kombin Çekme Hatası:", error); } 
+    finally { setIsLoading(false); }
+  };
+
+  // YENİ: Kırmızı Butona basınca Java'ya "Takvime Kaydet" diyen fonksiyon
+  const logOutfitToBackend = async (outfitId: number) => {
+    try {
+      const response = await fetch(`http://10.87.14.78:8080/api/v1/outfits/3/log/${outfitId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // Şimdilik hava durumunu sabit yolluyoruz, ileride telefondan çekeceğiz!
+        body: JSON.stringify({ weather: 'Güneşli, Harika bir gün', temperature: 22 }) 
+      });
+
+      if (response.ok) {
+        Alert.alert("Harika! 🎯", "Kombin başarıyla takvime kaydedildi ve istatistikler güncellendi!");
+      } else {
+        Alert.alert("Hata", "Kombin kaydedilemedi.");
+      }
+    } catch (error) {
+      Alert.alert("Bağlantı Hatası", "Sunucuya ulaşılamadı.");
+    }
+  };
 
   const fetchWardrobeData = async () => {
     setIsLoading(true);
@@ -85,15 +119,22 @@ export default function WardrobeScreen() {
   );
 
   // 2. Sekme: Kombin Kartı (Cladwell Tarzı)
+  //GERÇEK Kombin Kartı (GÜNCELLENDİ)
   const renderOutfitCard = ({ item }: { item: any }) => (
     <View style={styles.outfitCard}>
       <View style={styles.outfitImagesGrid}>
-        {item.images.map((img: string, idx: number) => (
-          <Image key={idx} source={{ uri: img }} style={styles.outfitThumbnail} resizeMode="cover" />
+        {/* item.clothes içindeki kıyafetlerin fotoğraflarını yan yana diziyoruz */}
+        {item.clothes && item.clothes.map((clothing: any, idx: number) => (
+          <Image key={idx} source={{ uri: clothing.imageUrl || 'https://via.placeholder.com/150' }} style={styles.outfitThumbnail} resizeMode="cover" />
         ))}
       </View>
       <Text style={styles.outfitName}>{item.name}</Text>
-      <TouchableOpacity style={styles.logOutfitButton}>
+      
+      {/* SİHİRLİ KIRMIZI BUTON BAĞLANDI */}
+      <TouchableOpacity 
+        style={styles.logOutfitButton} 
+        onPress={() => logOutfitToBackend(item.id)}
+      >
         <Text style={styles.logOutfitText}>GİYDİM (LOG)</Text>
       </TouchableOpacity>
     </View>
@@ -130,10 +171,28 @@ export default function WardrobeScreen() {
       
       {isLoading && !isRefreshing && <ActivityIndicator size="large" color="#2C3E50" style={{ marginVertical: 20 }} />}
       
-      {activeTab === 'ITEMS' ? (
-        <FlatList data={wardrobeItems} keyExtractor={(item) => item.id.toString()} renderItem={renderClothingCard} numColumns={2} contentContainerStyle={styles.listContainer} showsVerticalScrollIndicator={false} ListEmptyComponent={!isLoading ? <Text style={styles.emptyText}>Bu kategoride kıyafet yok.</Text> : null} refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} colors={['#2C3E50']} tintColor="#2C3E50" />} />
+{activeTab === 'ITEMS' ? (
+        <FlatList 
+          key="items-grid" // 🚨 YENİ: React'a bunun 2 sütunlu Parça listesi olduğunu söyledik
+          data={wardrobeItems} 
+          keyExtractor={(item) => item.id.toString()} 
+          renderItem={renderClothingCard} 
+          numColumns={2} 
+          contentContainerStyle={styles.listContainer} 
+          showsVerticalScrollIndicator={false} 
+          ListEmptyComponent={!isLoading ? <Text style={styles.emptyText}>Bu kategoride kıyafet yok.</Text> : null} 
+          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} colors={['#2C3E50']} tintColor="#2C3E50" />} 
+        />
       ) : (
-        <FlatList data={MOCK_OUTFITS} keyExtractor={(item) => item.id} renderItem={renderOutfitCard} contentContainerStyle={styles.listContainer} showsVerticalScrollIndicator={false} />
+        <FlatList 
+          key="outfits-list" // 🚨 YENİ: React'a bunun tek sütunlu Kombin listesi olduğunu söyledik
+          data={outfits} 
+          keyExtractor={(item) => item.id.toString()} 
+          renderItem={renderOutfitCard} 
+          contentContainerStyle={styles.listContainer} 
+          showsVerticalScrollIndicator={false} 
+          ListEmptyComponent={!isLoading ? <Text style={styles.emptyText}>Henüz bir kombin oluşturmadın.</Text> : null}
+        />
       )}
 
       {/* DEVASA KIYAFET DETAY PANELİ */}
