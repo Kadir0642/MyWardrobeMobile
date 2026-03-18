@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useRoute, useNavigation } from '@react-navigation/native';
 import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Alert, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ClothingItem } from '../types';
@@ -11,11 +12,38 @@ export default function StylistScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isFeedbackVisible, setIsFeedbackVisible] = useState(false);
 
-  useEffect(() => {
-    fetchAIRecomeendation();
-  }, []);
+  const route = useRoute<any>(); // Vitrin'den gelen kargoyu (Çapa ID'sini) okumak için
+  const anchorItemId = route.params?.anchorItemId; // Eğer Vitrin'den geldiysek burada bir ID olacak
 
-  const fetchAIRecomeendation = async () => {
+// Ekran açıldığında veya Vitrin'den yeni bir Çapa ID'si geldiğinde çalışır:
+  useEffect(() => {
+    if (anchorItemId) {
+      // 1. SENARYO: Kullanıcı "Sihirli Değnek" ile geldi! Java'daki yepyeni Çapa Algoritmanı çalıştır!
+      fetchOutfitFromAnchor(anchorItemId);
+    } else {
+      // 2. SENARYO: Kullanıcı normal menüden tıkladı (Varsayılan Günün Önerisi)
+      fetchDefaultRecommendation();
+    }
+  }, [anchorItemId]);
+
+  // JAVA'DAKİ YENİ ÇAPA (ANCHOR) ENDPOINT'İMİZİ ÇAĞIRAN FONKSİYON!
+  const fetchOutfitFromAnchor = async (id: number) => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`http://10.87.14.78:8080/api/v1/clothes/${id}/generate-outfit`);
+      if (response.ok) {
+        const data: ClothingItem[] = await response.json();
+        setCurrentOutfit(data); // Java'nın ürettiği muazzam kombini ekrana bas!
+      }
+    } catch (error) {
+      console.error("Çapa Kombin Hatası:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Varsayılan öneri sistemimiz (Normal tıklamalar için)
+  const fetchDefaultRecommendation = async () => {
     setIsLoading(true);
     try {
       const response = await fetch('http://10.87.14.78:8080/api/v1/clothes/3');
@@ -32,13 +60,13 @@ export default function StylistScreen() {
 
   const handleLike = () => {
     Alert.alert("Harika!", "Bu kombini günün kombini (OOTD) olarak kaydettik.");
-    fetchAIRecomeendation();
+    fetchDefaultRecommendation();
   };
 
   const submitFeedback = (reason: string) => {
     setIsFeedbackVisible(false);
     console.log("Feedback Gönderildi:", reason);
-    fetchAIRecomeendation();
+    fetchDefaultRecommendation();
   };
 
   return (

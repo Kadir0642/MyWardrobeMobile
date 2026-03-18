@@ -3,6 +3,7 @@ import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Alert, Ima
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker'; 
 import { ClothingItem } from '../types';
+import { useNavigation } from '@react-navigation/native';
 
 const CATEGORIES = ['Tümü', 'Üst Giyim', 'Alt Giyim', 'Dış Giyim', 'Ayakkabı', 'Aksesuar'];
 
@@ -19,6 +20,7 @@ export default function WardrobeScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ClothingItem | null>(null);
   const [activeCategory, setActiveCategory] = useState('Tümü');
+  const navigation = useNavigation<any>(); // Sekmeler arası geçiş motorumuz
 
   useEffect(() => { 
     if (activeTab === 'ITEMS') fetchWardrobeData(); 
@@ -151,12 +153,14 @@ export default function WardrobeScreen() {
             <View style={styles.analyticItem}><Text style={[styles.analyticValue, {color: '#27AE60'}]}>70₺</Text><Text style={styles.analyticLabel}>CPW</Text></View>
           </View>
 
-          {/* YENİ: SİHİRLİ ÇAPA BUTONU (Bununla Kombin Yap) */}
+          {/* ÇAPA (Anchor) (Bununla Kombin Yap) */}
           <TouchableOpacity 
             style={styles.magicWandButton}
             onPress={() => {
-              Alert.alert("Çapa Seçildi!", "Yapay zeka bu parçayı merkeze alarak sana yeni kombinler oluşturacak. (Backend'e geçince aktif olacak!)");
-              setSelectedItem(null); // Modalı kapatıp kombin ekranına yönlendireceğiz
+              const itemId = selectedItem?.id;
+              setSelectedItem(null); // Modalı kapat
+              // Kullanıcıyı Kombin sekmesine fırlat ve seçtiği kıyafetin ID'sini (Çapa) yanında götür!
+              navigation.navigate('Kombin', { anchorItemId: itemId }); 
             }}
           >
             <Ionicons name="color-wand" size={24} color="#FFFFFF" />
