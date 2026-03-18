@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Alert, Image, FlatList, Modal, RefreshControl, ScrollView } from 'react-native';
+import { Dimensions, StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Alert, Image, FlatList, Modal, RefreshControl, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker'; 
 import { ClothingItem } from '../types';
@@ -7,46 +7,42 @@ import { useNavigation } from '@react-navigation/native';
 
 const CATEGORIES = ['Tümü', 'Üst Giyim', 'Alt Giyim', 'Dış Giyim', 'Ayakkabı', 'Aksesuar'];
 
-
-
+// DÜZELTME 1: Ekran genişliğini EN DIŞARIYA aldık! Artık StyleSheet de görebilecek.
+const { width: SCREEN_WIDTH } = Dimensions.get('window'); 
 
 export default function WardrobeScreen() {
-  const [activeTab, setActiveTab] = useState<'ITEMS' | 'OUTFITS'>('ITEMS'); // YENİ: Parçalar ve Kombinler arası geçiş
+  const [activeTab, setActiveTab] = useState<'ITEMS' | 'OUTFITS'>('ITEMS'); 
   const [wardrobeItems, setWardrobeItems] = useState<ClothingItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ClothingItem | null>(null);
   const [activeCategory, setActiveCategory] = useState('Tümü');
-  const navigation = useNavigation<any>(); // Sekmeler arası geçiş motorumuz
-  // YENİ STATE: Gerçek Kombinleri tutacağımız liste
+  const navigation = useNavigation<any>(); 
+  
   const [outfits, setOutfits] = useState<any[]>([]);
 
-  // useEffect'i GÜNCELLE: Sekme değiştiğinde doğru veriyi çeksin
   useEffect(() => { 
     if (activeTab === 'ITEMS') fetchWardrobeData(); 
-    else if (activeTab === 'OUTFITS') fetchOutfitsData(); // Kombinler sekmesine geçince çalışır
+    else if (activeTab === 'OUTFITS') fetchOutfitsData(); 
   }, [activeCategory, activeTab]);
 
-  // YENİ: Java'dan kullanıcının (ID: 1) gerçek kombinlerini çeken fonksiyon
   const fetchOutfitsData = async () => {
     setIsLoading(true);
     try {
       const response = await fetch('http://10.87.14.78:8080/api/v1/outfits/user/3');
       if (response.ok) {
         const data = await response.json();
-        setOutfits(data); // Gelen OutfitDto listesini state'e kaydet
+        setOutfits(data); 
       }
     } catch (error) { console.error("Kombin Çekme Hatası:", error); } 
     finally { setIsLoading(false); }
   };
 
-  // YENİ: Kırmızı Butona basınca Java'ya "Takvime Kaydet" diyen fonksiyon
   const logOutfitToBackend = async (outfitId: number) => {
     try {
       const response = await fetch(`http://10.87.14.78:8080/api/v1/outfits/3/log/${outfitId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // Şimdilik hava durumunu sabit yolluyoruz, ileride telefondan çekeceğiz!
         body: JSON.stringify({ weather: 'Güneşli, Harika bir gün', temperature: 22 }) 
       });
 
@@ -63,7 +59,6 @@ export default function WardrobeScreen() {
   const fetchWardrobeData = async () => {
     setIsLoading(true);
     try {
-      // KENDİ IP ADRESİNİ YAZMAYI UNUTMA!
       const url = activeCategory === 'Tümü' 
         ? 'http://10.87.14.78:8080/api/v1/clothes/3'
         : `http://10.87.14.78:8080/api/v1/clothes/3/filter?category=${activeCategory}`;
@@ -83,11 +78,6 @@ export default function WardrobeScreen() {
     setIsRefreshing(false);
   };
 
-  
-// Görüntü yüklemenin Kuralları
-//Görsel Sıkıştırma: quality: 0.7 ayarı, görselin kalitesini %70 seviyesinde tutarken dosya boyutunu önemli ölçüde küçültür. Bu, ağ üzerinden veri gönderimini hızlandırmak için ideal bir dengedir.
-//Fotoğraf Çekimi: React Native'de react-native-camera veya Expo Camera gibi kütüphanelerle fotoğraf çekerken, kaydedilen dosyanın çok büyük olmaması için bu parametre verilir.
-//Görsel Seçimi: react-native-image-picker gibi araçlarla galeriden fotoğraf seçerken uygulamanın performansını korumak için kullanılır
   const pickImageAndUpload = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [4, 3], quality: 0.7 });
     if (!result.canceled) await uploadToBackend(result.assets[0].uri);
@@ -108,7 +98,6 @@ export default function WardrobeScreen() {
     finally { setIsLoading(false); }
   };
 
-  // 1. Sekme: Tekil Kıyafet Kartı
   const renderClothingCard = ({ item }: { item: ClothingItem }) => (
     <TouchableOpacity style={styles.card} activeOpacity={0.8} onPress={() => setSelectedItem(item)}>
       <Image source={{ uri: item.imageUrl || 'https://via.placeholder.com/150' }} style={styles.cardImage} resizeMode="contain" />
@@ -118,24 +107,22 @@ export default function WardrobeScreen() {
     </TouchableOpacity>
   );
 
-  // 2. Sekme: Kombin Kartı (Cladwell Tarzı)
-  //GERÇEK Kombin Kartı (GÜNCELLENDİ)
+  // YATAY KAYDIRMALI (Whering Tarzı) Kombin Kartı
   const renderOutfitCard = ({ item }: { item: any }) => (
-    <View style={styles.outfitCard}>
-      <View style={styles.outfitImagesGrid}>
-        {/* item.clothes içindeki kıyafetlerin fotoğraflarını yan yana diziyoruz */}
+    <View style={styles.outfitCarouselItem}>
+      <Text style={styles.outfitPremiumName}>{item.name}</Text>
+
+      <ScrollView contentContainerStyle={styles.outfitPremiumGrid} showsVerticalScrollIndicator={false}>
         {item.clothes && item.clothes.map((clothing: any, idx: number) => (
-          <Image key={idx} source={{ uri: clothing.imageUrl || 'https://via.placeholder.com/150' }} style={styles.outfitThumbnail} resizeMode="cover" />
+          <TouchableOpacity key={idx} style={styles.outfitPremiumThumbnailWrapper} onPress={() => setSelectedItem(clothing)}>
+            <Image source={{ uri: clothing.imageUrl || 'https://via.placeholder.com/150' }} style={styles.outfitPremiumThumbnail} resizeMode="cover" />
+          </TouchableOpacity>
         ))}
-      </View>
-      <Text style={styles.outfitName}>{item.name}</Text>
-      
-      {/* SİHİRLİ KIRMIZI BUTON BAĞLANDI */}
-      <TouchableOpacity 
-        style={styles.logOutfitButton} 
-        onPress={() => logOutfitToBackend(item.id)}
-      >
-        <Text style={styles.logOutfitText}>GİYDİM (LOG)</Text>
+      </ScrollView>
+
+      <TouchableOpacity style={styles.logOutfitPremiumButton} onPress={() => logOutfitToBackend(item.id)}>
+        <Ionicons name="calendar-outline" size={20} color="#FFFFFF" style={{marginRight: 10}} />
+        <Text style={styles.logOutfitPremiumText}>BUGÜN BUNU GİYDİM</Text>
       </TouchableOpacity>
     </View>
   );
@@ -147,7 +134,6 @@ export default function WardrobeScreen() {
         <TouchableOpacity style={styles.addButton} onPress={pickImageAndUpload}><Text style={styles.addButtonText}>+ Ekle</Text></TouchableOpacity>
       </View>
 
-      {/* YENİ: PARÇALAR VE KOMBİNLER GEÇİŞİ (Segmented Control) */}
       <View style={styles.tabContainer}>
         <TouchableOpacity style={[styles.tabButton, activeTab === 'ITEMS' && styles.tabActive]} onPress={() => setActiveTab('ITEMS')}>
           <Text style={[styles.tabText, activeTab === 'ITEMS' && styles.tabTextActive]}>PARÇALAR</Text>
@@ -171,31 +157,25 @@ export default function WardrobeScreen() {
       
       {isLoading && !isRefreshing && <ActivityIndicator size="large" color="#2C3E50" style={{ marginVertical: 20 }} />}
       
-{activeTab === 'ITEMS' ? (
-        <FlatList 
-          key="items-grid" // 🚨 YENİ: React'a bunun 2 sütunlu Parça listesi olduğunu söyledik
-          data={wardrobeItems} 
-          keyExtractor={(item) => item.id.toString()} 
-          renderItem={renderClothingCard} 
-          numColumns={2} 
-          contentContainerStyle={styles.listContainer} 
-          showsVerticalScrollIndicator={false} 
-          ListEmptyComponent={!isLoading ? <Text style={styles.emptyText}>Bu kategoride kıyafet yok.</Text> : null} 
-          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} colors={['#2C3E50']} tintColor="#2C3E50" />} 
-        />
+      {activeTab === 'ITEMS' ? (
+        <FlatList key="items-grid" data={wardrobeItems} keyExtractor={(item) => item.id.toString()} renderItem={renderClothingCard} numColumns={2} contentContainerStyle={styles.listContainer} showsVerticalScrollIndicator={false} ListEmptyComponent={!isLoading ? <Text style={styles.emptyText}>Bu kategoride kıyafet yok.</Text> : null} refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} colors={['#2C3E50']} tintColor="#2C3E50" />} />
       ) : (
         <FlatList 
-          key="outfits-list" // 🚨 YENİ: React'a bunun tek sütunlu Kombin listesi olduğunu söyledik
+          key="outfits-carousel" 
           data={outfits} 
           keyExtractor={(item) => item.id.toString()} 
           renderItem={renderOutfitCard} 
-          contentContainerStyle={styles.listContainer} 
-          showsVerticalScrollIndicator={false} 
+          contentContainerStyle={styles.outfitCarouselContainer} 
+          horizontal={true} 
+          pagingEnabled={true} 
+          showsHorizontalScrollIndicator={false} 
+          snapToInterval={SCREEN_WIDTH} 
+          decelerationRate="fast" 
           ListEmptyComponent={!isLoading ? <Text style={styles.emptyText}>Henüz bir kombin oluşturmadın.</Text> : null}
         />
       )}
 
-      {/* DEVASA KIYAFET DETAY PANELİ */}
+      {/* DETAY PANELİ */}
       <Modal visible={selectedItem !== null} animationType="slide" presentationStyle="pageSheet">
         <View style={styles.detailContainer}>
           <View style={styles.detailHeader}>
@@ -212,20 +192,17 @@ export default function WardrobeScreen() {
             <View style={styles.analyticItem}><Text style={[styles.analyticValue, {color: '#27AE60'}]}>70₺</Text><Text style={styles.analyticLabel}>CPW</Text></View>
           </View>
 
-          {/* ÇAPA (Anchor) (Bununla Kombin Yap) */}
           <TouchableOpacity 
             style={styles.magicWandButton}
             onPress={() => {
               const itemId = selectedItem?.id;
-              setSelectedItem(null); // Modalı kapat
-              // Kullanıcıyı Kombin sekmesine fırlat ve seçtiği kıyafetin ID'sini (Çapa) yanında götür!
+              setSelectedItem(null); 
               navigation.navigate('Kombin', { anchorItemId: itemId }); 
             }}
           >
             <Ionicons name="color-wand" size={24} color="#FFFFFF" />
             <Text style={styles.magicWandText}>BUNUNLA KOMBİN ÜRET</Text>
           </TouchableOpacity>
-          
         </View>
       </Modal>
     </View>
@@ -233,13 +210,12 @@ export default function WardrobeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FAF9F6', paddingTop: 50 }, // Premium arka plan rengi
+  container: { flex: 1, backgroundColor: '#FAF9F6', paddingTop: 50 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 15 },
   title: { fontSize: 28, fontWeight: '900', color: '#1A1A1A', letterSpacing: -0.5 },
   addButton: { backgroundColor: '#1A1A1A', paddingVertical: 10, paddingHorizontal: 15, borderRadius: 20 },
   addButtonText: { color: 'white', fontWeight: 'bold' },
   
-  // Segmented Control (Parçalar / Kombinler)
   tabContainer: { flexDirection: 'row', backgroundColor: '#EFEFEF', marginHorizontal: 20, borderRadius: 10, padding: 4, marginBottom: 15 },
   tabButton: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
   tabActive: { backgroundColor: '#FFFFFF', elevation: 2, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 3 },
@@ -259,16 +235,7 @@ const styles = StyleSheet.create({
   cardImage: { width: 120, height: 120, marginBottom: 10 },
   cardInfo: { width: '100%', alignItems: 'center' },
   cardName: { fontSize: 13, fontWeight: '700', color: '#333333', textAlign: 'center' },
-  
-  // Kombin Kartı Stilleri
-  outfitCard: { backgroundColor: '#FFFFFF', margin: 10, borderRadius: 16, padding: 15, borderWidth: 1, borderColor: '#F0F0F0', alignItems: 'center' },
-  outfitImagesGrid: { flexDirection: 'row', gap: 10, marginBottom: 15 },
-  outfitThumbnail: { width: 100, height: 120, borderRadius: 8, backgroundColor: '#F9F9F9' },
-  outfitName: { fontSize: 16, fontWeight: 'bold', color: '#1A1A1A', marginBottom: 15 },
-  logOutfitButton: { backgroundColor: '#D9534F', paddingVertical: 10, width: '100%', borderRadius: 25, alignItems: 'center' },
-  logOutfitText: { color: '#FFFFFF', fontWeight: '800', fontSize: 14, letterSpacing: 1 },
 
-  // Modal ve Sihirli Buton
   detailContainer: { flex: 1, backgroundColor: '#FAF9F6', paddingHorizontal: 20, paddingTop: 20 },
   detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 15 },
   detailTitle: { fontSize: 14, fontWeight: 'bold', color: '#888888', letterSpacing: 2 },
@@ -279,7 +246,46 @@ const styles = StyleSheet.create({
   analyticValue: { fontSize: 24, fontWeight: '900', color: '#1A1A1A' },
   analyticLabel: { fontSize: 11, color: '#888888', marginTop: 4, fontWeight: '700', textTransform: 'uppercase' },
   
-  // YENİ: SİHİRLİ BUTON CSS
   magicWandButton: { flexDirection: 'row', backgroundColor: '#1A1A1A', paddingVertical: 16, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginTop: 'auto', marginBottom: 30, gap: 10 },
   magicWandText: { color: '#FFFFFF', fontWeight: '800', fontSize: 15, letterSpacing: 1 },
+
+  // PREMIMUM YATAY KOMBİN VİTRİNİ STİLLERİ
+  outfitCarouselContainer: { paddingBottom: 20 },
+  outfitCarouselItem: { 
+    width: SCREEN_WIDTH, 
+    height: 520, 
+    padding: 20, 
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF', 
+    borderRadius: 20,
+    elevation: 3, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, 
+  },
+  
+  outfitPremiumName: { fontSize: 22, fontWeight: '900', color: '#1A1A1A', letterSpacing: -1, marginBottom: 15 },
+  
+  outfitPremiumGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
+  outfitPremiumThumbnailWrapper: {
+    width: '45%', 
+    height: 180, 
+    borderRadius: 12, 
+    overflow: 'hidden', 
+    backgroundColor: '#F9F9F9',
+    borderWidth: 1,
+    borderColor: '#EEEEEE'
+  },
+  outfitPremiumThumbnail: { width: '100%', height: '100%' },
+
+  logOutfitPremiumButton: { 
+    flexDirection: 'row', 
+    backgroundColor: '#D9534F', 
+    paddingVertical: 15, 
+    width: '100%', 
+    borderRadius: 12, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    marginTop: 20,
+    elevation: 5, shadowColor: '#D9534F', shadowOpacity: 0.3, shadowRadius: 10 
+  },
+  logOutfitPremiumText: { color: '#FFFFFF', fontWeight: '900', fontSize: 15, letterSpacing: 1.5, textTransform: 'uppercase' }
 });
