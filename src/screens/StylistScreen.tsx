@@ -106,45 +106,52 @@ const { profileName, profileImage } = useProfile();
   // Kaydırma motoru için ScrollView referanslarını tutan sözlük
   const scrollViewRefs = useRef<{ [key: string]: ScrollView | null }>({});
 
-  // GERÇEK ZAMANLI HAVA DURUMU SİMÜLASYONU
-  const [weather, setWeather] = useState({ temp: '10.0 °C', condition: 'Partly Sunny', icon: 'cloud' });
-  
-  // GERÇEK ZAMANLI HAVA DURUMU SİSTEMİ
+// 🚀 GERÇEK ZAMANLI HAVA DURUMU (Şehir bilgisi ile)
+  const [weather, setWeather] = useState({ temp: '--°C', city: 'Konum Bulunuyor...', icon: 'loader' });
+
+// ☁️ ÜCRETSİZ HAVA DURUMU VE ŞEHİR MOTORU (Open-Meteo & Expo)
   useEffect(() => {
     (async () => {
-      // 1. Kullanıcıdan konum izni iste
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setWeather({ temp: '--', condition: 'İzin Yok', icon: 'slash' });
-        return;
-      }
-
-      // 2. Koordinatları al
-      let location = await Location.getCurrentPositionAsync({});
-      const { latitude, longitude } = location.coords;
-
-      // 3. OpenWeatherMap'ten veriyi çek (Kendi ücretsiz API key'ini 'APPID' kısmına yazmalısın)
-      const API_KEY = "SENIN_OPENWEATHER_API_ANAHTARIN"; 
       try {
-        const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=metric&appid=${API_KEY}`);
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          setWeather({ temp: '--', city: 'İzin Yok', icon: 'slash' });
+          return;
+        }
+
+        // 1. Koordinatları Al
+        let location = await Location.getCurrentPositionAsync({});
+        const { latitude, longitude } = location.coords;
+
+        // 2. Koordinatı Şehre Çevir (Ücretsiz Expo Metodu)
+        const geocode = await Location.reverseGeocodeAsync({ latitude, longitude });
+        const cityName = geocode[0]?.city || geocode[0]?.subregion || 'Konum';
+
+        // 3. Open-Meteo'dan Hava Durumunu Çek (API KEY YOK, SINIR YOK!)
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
         const data = await res.json();
 
-        // Gelen hava durumuna göre otomatik ikon seçimi
-        let featherIcon = 'sun';
-        const mainWeather = data.weather[0].main.toLowerCase();
-        if (mainWeather.includes('cloud')) featherIcon = 'cloud';
-        if (mainWeather.includes('rain')) featherIcon = 'cloud-rain';
-        if (mainWeather.includes('snow')) featherIcon = 'cloud-snow';
-        if (mainWeather.includes('lightning')) featherIcon = 'cloud-lightning';
+        if (data.current_weather) {
+          const wmoCode = data.current_weather.weathercode;
+          const temp = Math.round(data.current_weather.temperature);
+          
+          // WMO (Dünya Meteoroloji Örgütü) Kodlarını İkonlara Çevir
+          let featherIcon = 'sun';
+          if (wmoCode >= 1 && wmoCode <= 3) featherIcon = 'cloud'; // Parçalı bulutlu
+          if (wmoCode >= 45 && wmoCode <= 48) featherIcon = 'align-justify'; // Sisli
+          if (wmoCode >= 51 && wmoCode <= 67) featherIcon = 'cloud-rain'; // Yağmurlu
+          if (wmoCode >= 71 && wmoCode <= 77) featherIcon = 'cloud-snow'; // Karlı
+          if (wmoCode >= 95) featherIcon = 'cloud-lightning'; // Fırtınalı
 
-        // State'i güncelle ve ekrana bas
-        setWeather({
-          temp: `${Math.round(data.main.temp)}°C`, // Örn: 10°C
-          condition: data.weather[0].main,
-          icon: featherIcon
-        });
+          setWeather({
+            temp: `${temp}°C`,
+            city: cityName,
+            icon: featherIcon
+          });
+        }
       } catch (error) {
-        console.error("Hava durumu çekilemedi: ", error);
+        console.warn("Hava durumu motoru hatası: ", error);
+        setWeather({ temp: '10°C', city: 'İstanbul', icon: 'cloud' }); // Çökerse varsayılan
       }
     })();
   }, []);
@@ -212,7 +219,6 @@ const { profileName, profileImage } = useProfile();
   // 🎰 MIX (KARIŞTIRMA) FONKSİYONU
   const handleDiceRoll = () => {
     setIsLoading(true);
-
     // Ekranda aktif olan her bir satırı (Tops, Bottoms vb.) kontrol et
     dressMeRows.forEach(row => {
       // EĞER SATIR KİLİTLİ DEĞİLSE (PINNEDROWS İÇİNDE YOKSA) KAYDIR!
@@ -306,7 +312,7 @@ const renderDressMeRow = (rowId: string, items: any[]) => (
         <View style={styles.headerRight}>
           <View style={styles.weatherBadge}>
             <Feather name={weather.icon as any} size={14} color="#555" />
-            <Text style={styles.weatherText}>{weather.temp}</Text>
+            <Text style={styles.weatherText}>{weather.city}, {weather.temp}</Text>
             <Feather name="chevron-down" size={14} color="#555" />
           </View>
           <TouchableOpacity style={[styles.modeToggle, is3DMode && styles.modeToggleActive]} onPress={() => setIs3DMode(!is3DMode)}>
