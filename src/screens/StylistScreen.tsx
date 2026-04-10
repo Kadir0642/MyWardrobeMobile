@@ -5,6 +5,7 @@ import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile } from '../context/ProfileContext';
 import { ClothingItem } from '../types';
+import * as Location from 'expo-location';
 
 const { width, height } = Dimensions.get('window');
 
@@ -99,9 +100,54 @@ const { profileName, profileImage } = useProfile();
   const [activeTab, setActiveTab] = useState('Dress Me'); 
   const [isLoading, setIsLoading] = useState(false);
   const [is3DMode, setIs3DMode] = useState(false);
+  // Kilitlenen (Pinlenen) satırların ID'lerini tutar
+  const [pinnedRows, setPinnedRows] = useState<string[]>([]);
+  
+  // Kaydırma motoru için ScrollView referanslarını tutan sözlük
+  const scrollViewRefs = useRef<{ [key: string]: ScrollView | null }>({});
 
   // GERÇEK ZAMANLI HAVA DURUMU SİMÜLASYONU
   const [weather, setWeather] = useState({ temp: '10.0 °C', condition: 'Partly Sunny', icon: 'cloud' });
+  
+  // GERÇEK ZAMANLI HAVA DURUMU SİSTEMİ
+  useEffect(() => {
+    (async () => {
+      // 1. Kullanıcıdan konum izni iste
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setWeather({ temp: '--', condition: 'İzin Yok', icon: 'slash' });
+        return;
+      }
+
+      // 2. Koordinatları al
+      let location = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = location.coords;
+
+      // 3. OpenWeatherMap'ten veriyi çek (Kendi ücretsiz API key'ini 'APPID' kısmına yazmalısın)
+      const API_KEY = "SENIN_OPENWEATHER_API_ANAHTARIN"; 
+      try {
+        const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=metric&appid=${API_KEY}`);
+        const data = await res.json();
+
+        // Gelen hava durumuna göre otomatik ikon seçimi
+        let featherIcon = 'sun';
+        const mainWeather = data.weather[0].main.toLowerCase();
+        if (mainWeather.includes('cloud')) featherIcon = 'cloud';
+        if (mainWeather.includes('rain')) featherIcon = 'cloud-rain';
+        if (mainWeather.includes('snow')) featherIcon = 'cloud-snow';
+        if (mainWeather.includes('lightning')) featherIcon = 'cloud-lightning';
+
+        // State'i güncelle ve ekrana bas
+        setWeather({
+          temp: `${Math.round(data.main.temp)}°C`, // Örn: 10°C
+          condition: data.weather[0].main,
+          icon: featherIcon
+        });
+      } catch (error) {
+        console.error("Hava durumu çekilemedi: ", error);
+      }
+    })();
+  }, []);
 
   // CANVAS STATE YÖNETİMİ
   const [canvasItems, setCanvasItems] = useState<any[]>([]);
@@ -156,8 +202,34 @@ const { profileName, profileImage } = useProfile();
   const handleDelete = () => { if (!selectedItemId) return; setCanvasItems(items => items.filter(item => item.id !== selectedItemId)); setSelectedItemId(null); };
   const handleRotate = (id: string) => { setCanvasItems(items => items.map(item => item.id === id ? { ...item, rotation: (item.rotation || 0) + 15 } : item)); };
 
+  // 📌 KİLİTLEME FONKSİYONU (İğneye basınca çalışır)
+  const togglePin = (rowId: string) => {
+    setPinnedRows(prev => 
+      prev.includes(rowId) ? prev.filter(id => id !== rowId) : [...prev, rowId]
+    );
+  };
+
+  // 🎰 MIX (KARIŞTIRMA) FONKSİYONU
   const handleDiceRoll = () => {
     setIsLoading(true);
+
+    // Ekranda aktif olan her bir satırı (Tops, Bottoms vb.) kontrol et
+    dressMeRows.forEach(row => {
+      // EĞER SATIR KİLİTLİ DEĞİLSE (PINNEDROWS İÇİNDE YOKSA) KAYDIR!
+      if (!pinnedRows.includes(row.id)) {
+        const ref = scrollViewRefs.current[row.id];
+        
+        if (ref && row.data.length > 0) {
+          // O kategorideki kıyafet sayısı arasından rastgele bir indeks seç
+          const randomIndex = Math.floor(Math.random() * row.data.length);
+          
+          // Slot makinesi animasyonunu tetikle (width değeri resimlerin genişliğidir)
+          ref.scrollTo({ x: randomIndex * width, animated: true });
+        }
+      }
+    });
+
+    // Animasyonların bitmesini bekle ve yükleniyor ikonunu kapat
     setTimeout(() => { setIsLoading(false); }, 800);
   };
 
@@ -184,14 +256,34 @@ const { profileName, profileImage } = useProfile();
   }).filter(row => row.data.length > 0); // Sadece içi dolu olanları ekrana basıyoruz
 
   //  Küçültülmüş, İsimsiz Büyük Görselli Slot Satırı
-  const renderDressMeRow = (rowId: string, items: any[]) => (
+const renderDressMeRow = (rowId: string, items: any[]) => (
     <View style={styles.dressMeRowContainer} key={rowId}>
-      <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} snapToInterval={width} decelerationRate="fast">
+      <ScrollView 
+        horizontal 
+        pagingEnabled 
+        showsHorizontalScrollIndicator={false} 
+        snapToInterval={width} 
+        decelerationRate="fast"
+        // 🚀 MOTOR BAĞLANTISI: Referansı kaydediyoruz
+        ref={(el) => (scrollViewRefs.current[rowId] = el)} 
+      >
         {items.map((item, index) => (
           <View key={`${rowId}-${item.id}-${index}`} style={styles.dressMeImageWrapper}>
             <Image source={{ uri: item.uri }} style={styles.dressMeItemImage} />
-            <TouchableOpacity style={styles.pinIconContainer} activeOpacity={0.7}>
-              <MaterialCommunityIcons name="pin-outline" size={22} color="#1A1A1A" style={{ transform: [{ rotate: '45deg' }] }} />
+            
+            {/* 🚀 KİLİT (PIN) BUTONU BAĞLANTISI */}
+            <TouchableOpacity 
+              style={[styles.pinIconContainer, pinnedRows.includes(rowId) && { backgroundColor: '#1A1A1A', borderRadius: 15 }]} 
+              activeOpacity={0.7}
+              onPress={() => togglePin(rowId)} // Tıklanınca Kilitler/Açar
+            >
+              <MaterialCommunityIcons 
+                name={pinnedRows.includes(rowId) ? "pin" : "pin-outline"} 
+                size={22} 
+                // Kilitliyse Fosforlu Yeşil, Değilse Siyah
+                color={pinnedRows.includes(rowId) ? "#CCFF00" : "#1A1A1A"} 
+                style={{ transform: [{ rotate: '45deg' }] }} 
+              />
             </TouchableOpacity>
           </View>
         ))}
@@ -303,14 +395,14 @@ const { profileName, profileImage } = useProfile();
               <MaterialCommunityIcons name="human-male" size={24} color={activeDressMeLayout === 1 ? "#1A1A1A" : "#B0B0B0"} />
             </TouchableOpacity>
             
-            {/* Tuş 3: SİYAH MIX BUTONU */}
-            <TouchableOpacity style={styles.generateOutfitBtnHorizontal} onPress={handleDiceRoll} activeOpacity={0.8}>
-              {isLoading ? <ActivityIndicator color="#FFF" size="small" /> : <MaterialCommunityIcons name="shuffle-variant" size={22} color="#FFFFFF" />}
-            </TouchableOpacity>
-
-            {/* Tuş 4: Outerwear, Tops, Bottoms, Footwear, Acc, Acc */}
+            {/* Tuş 3: Outerwear, Tops, Bottoms, Footwear, Acc, Acc */}
             <TouchableOpacity style={styles.horizontalIconBtn} onPress={() => setActiveDressMeLayout(2)}>
               <MaterialCommunityIcons name="layers-triple-outline" size={24} color={activeDressMeLayout === 2 ? "#1A1A1A" : "#B0B0B0"} />
+            </TouchableOpacity>
+
+            {/* Tuş 4: SİYAH MIX BUTONU */}
+            <TouchableOpacity style={styles.generateOutfitBtnHorizontal} onPress={handleDiceRoll} activeOpacity={0.8}>
+              {isLoading ? <ActivityIndicator color="#FFF" size="small" /> : <MaterialCommunityIcons name="shuffle-variant" size={22} color="#FFFFFF" />}
             </TouchableOpacity>
             
           </View>
