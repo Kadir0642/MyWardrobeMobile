@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   coverContainer: {
     width: '100%', 
     height: 320, 
-    backgroundColor: '#5A8DEE', 
+    backgroundColor: '#dbe872', 
     justifyContent: 'center', alignItems: 'center'
     // position: 'absolute' SİLİNDİ! Artık akışın içinde.
   },
