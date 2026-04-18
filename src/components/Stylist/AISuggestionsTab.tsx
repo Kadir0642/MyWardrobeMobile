@@ -4,13 +4,11 @@ import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');
 
-// 🚀 ANA EKRANDAN GELEN GERÇEK VERİLER (Hava durumu eklendi)
 interface AISuggestionsTabProps {
-  allWardrobe: any[];
-  weather: { temp: string; city: string; icon: string };
+  allWardrobe: any[]; // Artık sadece yedek/fallback olarak duruyor
+  weather?: { temp: string; city: string; icon: string };
 }
-//  IZGARA (GRID) KOORDİNATLARI
-// Ekran 2 Sütun ve 3 Satır olacak şekilde görünmez 6 odacığa bölündü.
+
 const COLLAGE_POSITIONS = [
   { top: '2%', left: '4%', width: '44%', height: '30%' },    
   { top: '2%', right: '4%', width: '44%', height: '30%' },   
@@ -21,100 +19,112 @@ const COLLAGE_POSITIONS = [
 ];
 
 export default function AISuggestionsTab({ allWardrobe = [], weather }: AISuggestionsTabProps) {
-  const [isFeedbackVisible, setFeedbackVisible] = useState(false);
   const [currentOutfit, setCurrentOutfit] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [activeBlueprintIndex, setActiveBlueprintIndex] = useState<0 | 1 | 2>(0);
 
-  // 3 KATMANLI ŞABLONLAR
-  const AI_BLUEPRINTS = [
-    ['Tops', 'Bottoms', 'Footwear', 'Accessories'],                                  
-    ['Full_body', 'Footwear', 'Accessories', 'Accessories', 'Accessories'],          
-    ['Outerwear', 'Tops', 'Bottoms', 'Footwear', 'Accessories', 'Accessories']       
-  ];
-// 🎰 AKILLI KOMBİN ÜRETİCİ MOTOR
-  const generateNewOutfit = (targetIndex?: number) => {
+  // 🛑 MODAL VE GERİ BİLDİRİM STATE'LERİ
+  const [isFeedbackVisible, setFeedbackVisible] = useState(false);
+  const [feedbackStep, setFeedbackStep] = useState<'REASON' | 'SELECT_ITEMS'>('REASON');
+  const [selectedReasonCode, setSelectedReasonCode] = useState<string>('NONE');
+  const [selectedTargetItems, setSelectedTargetItems] = useState<number[]>([]);
+
+  // 🌐 1. JAVA API'DEN KOMBİN ÇEKME MOTORU (THIN CLIENT)
+  const fetchOutfitFromAPI = async (blueprintIndex: number) => {
     setIsLoading(true);
-    if (allWardrobe.length === 0) { setIsLoading(false); return; }
-
-    const indexToUse = targetIndex !== undefined ? targetIndex : activeBlueprintIndex;
-    const selectedBlueprint = AI_BLUEPRINTS[indexToUse];
-    
-    const newOutfitItems: any[] = [];
-    const usedIds = new Set(); 
-
-    selectedBlueprint.forEach(category => {
-      const matchingItems = allWardrobe.filter(item => item.category === category && !usedIds.has(item.id));
-      if (matchingItems.length > 0) {
-        const randomItem = matchingItems[Math.floor(Math.random() * matchingItems.length)];
-        newOutfitItems.push(randomItem);
-        usedIds.add(randomItem.id); 
+    try {
+      // Senin Java API Ucun (GET İsteği)
+      const response = await fetch(`http://10.87.14.78:8080/api/v1/outfits/suggest?userId=3&blueprintIndex=${blueprintIndex}`);
+      if (response.ok) {
+        const data = await response.json();
+        // Java'dan gelen veriyi (resim url'lerini vs) state'e atıyoruz
+        // Eğer backend 'imageUrl' dönüyorsa ve biz 'uri' kullanıyorsak mapliyoruz:
+        const formattedData = data.map((item: any) => ({
+          id: item.id.toString(),
+          uri: item.imageUrl || item.uri, 
+          category: item.category
+        }));
+        setCurrentOutfit(formattedData);
+      } else {
+        console.error("Java Kombin Getirme Hatası:", response.status);
       }
-    });
-
-    setTimeout(() => {
-      setCurrentOutfit(newOutfitItems);
-      setIsLoading(false);
-    }, 500); 
+    } catch (error) {
+      console.error("Ağ Hatası (Kombin Çekilemedi):", error);
+    } finally {
+      setTimeout(() => setIsLoading(false), 300); // UI pürüzsüzlüğü için ufak gecikme
+    }
   };
 
+  // Bileşen ilk yüklendiğinde Kombini Java'dan çek
   useEffect(() => {
-    if (allWardrobe.length > 0 && currentOutfit.length === 0) generateNewOutfit();
-  }, [allWardrobe]);
+    fetchOutfitFromAPI(activeBlueprintIndex);
+  }, []);
 
   const handleBlueprintChange = (index: 0 | 1 | 2) => {
     if (index !== activeBlueprintIndex) {
       setActiveBlueprintIndex(index);
-      generateNewOutfit(index); 
+      fetchOutfitFromAPI(index); 
     }
   };
 
-  // 🌐 JAVA SPRING BOOT API BAĞLANTISI (RLHF VERİ KÖPRÜSÜ)
-  const sendFeedbackToAPI = async (feedbackType: string, reasonCode: string = 'NONE') => {
+  // 🌐 2. JAVA API'YE GERİ BİLDİRİM (LOG) GÖNDERME
+  const sendFeedbackToAPI = async (feedbackType: string, reasonCode: string, targetIds: number[]) => {
     if (currentOutfit.length === 0) return;
 
-    // Ekranda o an gösterilen kıyafetlerin ID'lerini çıkartıyoruz
     const outfitItemIds = currentOutfit.map(item => parseInt(item.id));
+    const weatherString = weather ? `${weather.city}, ${weather.temp}` : "Bilinmiyor";
 
-    // Java'daki OutfitFeedbackDto ile birebir eşleşen JSON paketimiz
     const payload = {
-      userId: 3, // TODO: Sisteme gerçek Auth eklenince burası dinamik olacak
+      userId: 3, 
       outfitItemIds: outfitItemIds,
-      feedbackType: feedbackType, // 'LIKE' veya 'DISLIKE'
-      reasonCode: reasonCode,     // Örn: 'COLOR_MISMATCH'
-      targetItemIds: [],          // Şimdilik boş, ileride spesifik eşya seçimi ekleyebiliriz
-      weatherContext: `${weather.city}, ${weather.temp}`
+      feedbackType: feedbackType, 
+      reasonCode: reasonCode,     
+      targetItemIds: targetIds,   // 🚀 Kullanıcının seçtiği spesifik eşyalar!
+      weatherContext: weatherString
     };
 
     try {
-      // Senin Java API ucun (IP adresini kontrol et)
-      const response = await fetch('http://10.87.14.78:8080/api/v1/feedback', {
+      await fetch('http://10.87.14.78:8080/api/v1/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-
-      if (response.ok) {
-        console.log(`✅ RLHF Datası Java'ya İletildi! Tip: ${feedbackType}, Sebep: ${reasonCode}`);
-      } else {
-        console.error("❌ Java API Hatası (HTTP " + response.status + ")");
-      }
+      console.log(`✅ Feedback İletildi. Sebep: ${reasonCode}, Seçilenler: ${targetIds}`);
     } catch (error) {
-      console.error("❌ Ağ Bağlantı Hatası: Sunucuya ulaşılamıyor.", error);
+      console.error("Java API Bağlantı Hatası:", error);
     }
   };
 
-  // 🛑 ÇARPI (CEZA) AKSİYONU
-  const submitFeedback = (reason: string) => {
-    setFeedbackVisible(false);
-    sendFeedbackToAPI('DISLIKE', reason); // Önce Java'ya gönder
-    generateNewOutfit(); // Sonra ekranı yenile
+  // 🛑 MODAL İÇİ MANTIKLAR
+  const handleReasonSelect = (reasonId: string) => {
+    // Eğer sebep spesifik eşya seçimi gerektiriyorsa (Referans görsellerindeki gibi)
+    if (['DONT_PAIR_THESE', 'TOO_WARM_FOR_WEATHER', 'TOO_COOL_FOR_WEATHER', 'EXCLUDE_SPECIFIC_ITEM'].includes(reasonId)) {
+      setSelectedReasonCode(reasonId);
+      setSelectedTargetItems([]); // Önceki seçimleri temizle
+      setFeedbackStep('SELECT_ITEMS'); // Alt ekrana geç
+    } else {
+      // Eşya seçimi gerektirmeyen bir sebepse (Örn: Mismatched Categories) direkt gönder
+      executeDislike(reasonId, []);
+    }
   };
 
-  // 💚 KALP (ÖDÜL) AKSİYONU
+  const toggleTargetItem = (id: string) => {
+    const numId = parseInt(id);
+    setSelectedTargetItems(prev => 
+      prev.includes(numId) ? prev.filter(i => i !== numId) : [...prev, numId]
+    );
+  };
+
+  const executeDislike = (reason: string, targets: number[]) => {
+    setFeedbackVisible(false);
+    setFeedbackStep('REASON'); // Modalı sıfırla
+    sendFeedbackToAPI('DISLIKE', reason, targets); 
+    fetchOutfitFromAPI(activeBlueprintIndex); // Java'dan yeni kombin iste
+  };
+
   const handleLike = () => {
-    sendFeedbackToAPI('LIKE', 'NONE'); // Önce Java'ya gönder
-    generateNewOutfit(); // Sonra ekranı yenile
+    sendFeedbackToAPI('LIKE', 'NONE', []); 
+    fetchOutfitFromAPI(activeBlueprintIndex); 
   };
 
   return (
@@ -149,7 +159,7 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
         {isLoading ? (
            <ActivityIndicator size="large" color="#1A1A1A" style={{ marginTop: 100 }} />
         ) : currentOutfit.length === 0 ? (
-           <Text style={styles.emptyText}>Dolabında bu şablona uygun yeterli eşya yok.</Text>
+           <Text style={styles.emptyText}>Bu şablona uygun eşya bulunamadı.</Text>
         ) : (
            currentOutfit.map((item, index) => {
              const posStyle = COLLAGE_POSITIONS[index % COLLAGE_POSITIONS.length]; 
@@ -164,10 +174,10 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
 
       {/* AKSİYON BUTONLARI */}
       <View style={styles.aiActionRow}>
-         <TouchableOpacity style={styles.aiActionBtnDislike} onPress={() => setFeedbackVisible(true)}>
+         <TouchableOpacity style={styles.aiActionBtnDislike} onPress={() => { setFeedbackStep('REASON'); setFeedbackVisible(true); }}>
            <Feather name="x" size={32} color="#FF3B30" />
          </TouchableOpacity>
-         <TouchableOpacity style={styles.aiActionBtnNext} onPress={() => generateNewOutfit()}>
+         <TouchableOpacity style={styles.aiActionBtnNext} onPress={() => fetchOutfitFromAPI(activeBlueprintIndex)}>
            <MaterialCommunityIcons name="butterfly-outline" size={36} color="#1A1A1A" />
            <Text style={styles.aiNextText}>Next Outfit</Text>
          </TouchableOpacity>
@@ -176,32 +186,75 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
          </TouchableOpacity>
       </View>
 
-      {/* 🛑 MICRO-SORU BOTTOM SHEET (MODAL) */}
+      {/* 🛑 GELİŞMİŞ MICRO-SORU BOTTOM SHEET (MODAL) */}
       <Modal visible={isFeedbackVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.bottomSheet}>
             <View style={styles.sheetHandle} />
-            <Text style={styles.sheetSubtitle}>Don't like this recommendation?</Text>
-            <Text style={styles.sheetTitle}>Please select the reason you don't like this</Text>
-            
-            <ScrollView style={{ marginTop: 10 }} showsVerticalScrollIndicator={false}>
-              {[
-                { id: 'MISMATCHED_CATEGORIES', label: 'Mismatched categories' },
-                { id: 'COLOR_MISMATCH', label: "I don't like the color match" },
-                { id: 'TOO_COOL_FOR_WEATHER', label: 'I want a warmer outfit' },
-                { id: 'TOO_WARM_FOR_WEATHER', label: 'I want a cooler outfit' },
-                { id: 'DONT_PAIR_THESE', label: 'There are item(s) I want to exclude from my suggestions' }
-              ].map(opt => (
-                <TouchableOpacity key={opt.id} style={styles.feedbackOptionRow} onPress={() => submitFeedback(opt.id)}>
-                  <Text style={styles.feedbackOptionText}>{opt.label}</Text>
-                  <Feather name="chevron-right" size={20} color="#C0C0C0" />
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
 
-            <TouchableOpacity style={styles.cancelFeedbackBtn} onPress={() => setFeedbackVisible(false)}>
-              <Text style={styles.cancelFeedbackText}>Cancel</Text>
-            </TouchableOpacity>
+            {/* ADIM 1: SEBEP SEÇİMİ */}
+            {feedbackStep === 'REASON' && (
+              <>
+                <Text style={styles.sheetSubtitle}>Don't like this recommendation?</Text>
+                <Text style={styles.sheetTitle}>Please select the reason you don't like this</Text>
+                
+                <ScrollView style={{ marginTop: 10 }} showsVerticalScrollIndicator={false}>
+                  {[
+                    { id: 'MISMATCHED_CATEGORIES', label: 'Mismatched categories' },
+                    { id: 'COLOR_MISMATCH', label: "I don't like the color match" },
+                    { id: 'TOO_COOL_FOR_WEATHER', label: 'I want a warmer outfit' },
+                    { id: 'TOO_WARM_FOR_WEATHER', label: 'I want a cooler outfit' },
+                    { id: 'DONT_PAIR_THESE', label: 'There are item(s) I want to exclude from my suggestions' }
+                  ].map(opt => (
+                    <TouchableOpacity key={opt.id} style={styles.feedbackOptionRow} onPress={() => handleReasonSelect(opt.id)}>
+                      <Text style={styles.feedbackOptionText}>{opt.label}</Text>
+                      <Feather name="chevron-right" size={20} color="#C0C0C0" />
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <TouchableOpacity style={styles.cancelFeedbackBtn} onPress={() => setFeedbackVisible(false)}>
+                  <Text style={styles.cancelFeedbackText}>Cancel</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {/* ADIM 2: SPESİFİK EŞYA SEÇİMİ (Referans Tasarıma Göre) */}
+            {feedbackStep === 'SELECT_ITEMS' && (
+              <>
+                <Text style={styles.sheetTitle}>Select items to exclude</Text>
+                <Text style={styles.sheetSubtitle}>The selected clothes won't show up according to your feedback.</Text>
+                
+                <ScrollView contentContainerStyle={styles.selectionGrid} showsVerticalScrollIndicator={false}>
+                  {currentOutfit.map(item => {
+                    const isSelected = selectedTargetItems.includes(parseInt(item.id));
+                    return (
+                      <TouchableOpacity 
+                        key={`select-${item.id}`} 
+                        style={[styles.selectionCard, isSelected && styles.selectionCardActive]}
+                        onPress={() => toggleTargetItem(item.id)}
+                        activeOpacity={0.8}
+                      >
+                        <Image source={{ uri: item.uri }} style={styles.selectionImage} />
+                        {/* Seçim İkonu (Pembe Tik) */}
+                        <View style={[styles.checkboxIcon, isSelected && styles.checkboxIconActive]}>
+                          {isSelected && <Feather name="check" size={14} color="#FFF" />}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+
+                {/* SİYAH DONE BUTONU */}
+                <TouchableOpacity 
+                  style={[styles.doneBtn, selectedTargetItems.length === 0 && { opacity: 0.5 }]} 
+                  disabled={selectedTargetItems.length === 0}
+                  onPress={() => executeDislike(selectedReasonCode, selectedTargetItems)}
+                >
+                  <Text style={styles.doneBtnText}>Done</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
           </View>
         </View>
       </Modal>
@@ -229,12 +282,22 @@ const styles = StyleSheet.create({
   aiActionBtnNext: { alignItems: 'center', justifyContent: 'center', marginTop: 10 },
   aiNextText: { fontSize: 12, color: '#1A1A1A', fontWeight: '700', marginTop: 8 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  bottomSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 25, paddingBottom: 40, maxHeight: height * 0.7, shadowColor: '#000', shadowOffset: { width: 0, height: -5 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 20 },
+  bottomSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 25, paddingBottom: 40, maxHeight: height * 0.8, shadowColor: '#000', shadowOffset: { width: 0, height: -5 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 20 },
   sheetHandle: { width: 50, height: 5, backgroundColor: '#E0E0E0', borderRadius: 3, alignSelf: 'center', marginBottom: 20 },
-  sheetSubtitle: { fontSize: 14, color: '#888', textAlign: 'center', fontWeight: '600', marginBottom: 5 },
-  sheetTitle: { fontSize: 19, color: '#1A1A1A', textAlign: 'center', fontWeight: '700', marginBottom: 25 },
+  sheetSubtitle: { fontSize: 13, color: '#888', textAlign: 'center', fontWeight: '500', marginBottom: 5 },
+  sheetTitle: { fontSize: 18, color: '#1A1A1A', textAlign: 'center', fontWeight: '700', marginBottom: 25 },
   feedbackOptionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: '#F5F5F5' },
-  feedbackOptionText: { fontSize: 16, color: '#333', fontWeight: '500' },
-  cancelFeedbackBtn: { marginTop: 25, paddingVertical: 15, alignItems: 'center', backgroundColor: '#F5F5F5', borderRadius: 12 },
-  cancelFeedbackText: { fontSize: 16, fontWeight: '700', color: '#1A1A1A' }
+  feedbackOptionText: { fontSize: 15, color: '#333', fontWeight: '500' },
+  cancelFeedbackBtn: { marginTop: 15, paddingVertical: 15, alignItems: 'center', backgroundColor: '#F5F5F5', borderRadius: 12 },
+  cancelFeedbackText: { fontSize: 16, fontWeight: '700', color: '#1A1A1A' },
+
+  // 🛑 EŞYA SEÇİM EKRANI STİLLERİ (Referans tasarıma uygun)
+  selectionGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginTop: 10 },
+  selectionCard: { width: '48%', backgroundColor: '#FAFAFA', borderRadius: 12, padding: 10, marginBottom: 15, position: 'relative', height: 140, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: 'transparent' },
+  selectionCardActive: { borderColor: '#FF6B81', backgroundColor: '#FFF0F2' },
+  selectionImage: { width: '80%', height: '80%', resizeMode: 'contain' },
+  checkboxIcon: { position: 'absolute', top: 10, left: 10, width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#E0E0E0', justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' },
+  checkboxIconActive: { backgroundColor: '#FF6B81', borderColor: '#FF6B81' },
+  doneBtn: { backgroundColor: '#1A1A1A', paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginTop: 20 },
+  doneBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' }
 });
