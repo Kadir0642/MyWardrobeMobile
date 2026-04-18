@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 const MOCK_POSTS = [
   {
     id: '1',
-    user: { name: 'Melisa Gök', avatar: 'https://i.pravatar.cc/150?u=kadir' },
+    user: { name: 'Jane Nick', avatar: 'https://i.pravatar.cc/150?u=jane' },
     outfitImage: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=800&auto=format&fit=crop',
     likes: 342,
     caption: 'Bahar ayları için favori kapsül dolap kombinim! 🌿🧥 Siyah tişört her zaman kurtarır.',

@@ -62,7 +62,7 @@ export default function WardrobeScreen({ navigation }: any) {
   // 1. JAVA'DAN TÜM DOLABI ÇEK (Sadece Refresh'te veya Geri Dönüşte çalışır)
   const fetchWardrobe = async () => {
     try {
-      const response = await fetch('http://172.30.55.25:8080/api/v1/clothes/3');
+      const response = await fetch('http://10.87.14.78:8080/api/v1/clothes/3');
       if (response.ok) {
         const data = await response.json();
         const formattedItems = data.map((item: any) => ({
@@ -141,7 +141,7 @@ export default function WardrobeScreen({ navigation }: any) {
       formData.append('image', { uri: imageUri, name: 'wardrobe_item.jpg', type: 'image/jpeg' } as any);
 
       try {
-        const extractResponse = await fetch('http://172.30.55.25:8080/api/v1/clothes/3/ai-extract', {
+        const extractResponse = await fetch('http://10.87.14.78:8080/api/v1/clothes/3/ai-extract', {
           method: 'POST', body: formData, headers: { 'Accept': 'application/json' },
         });
 
