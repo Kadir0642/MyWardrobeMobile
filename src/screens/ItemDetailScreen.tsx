@@ -156,7 +156,7 @@ const handleSave = async () => {
     };
 
 try {
-      const response = await fetch(`http://10.87.14.78:8080/api/v1/clothes/${item.id}`, {
+      const response = await fetch(`http://172.30.55.25:8080/api/v1/clothes/${item.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify(updatedData)

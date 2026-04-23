@@ -34,7 +34,7 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
     setIsLoading(true);
     try {
       // Senin Java API Ucun (GET İsteği)
-      const response = await fetch(`http://10.87.14.78:8080/api/v1/outfits/suggest?userId=3&blueprintIndex=${blueprintIndex}`);
+      const response = await fetch(`http://172.30.55.25:8080/api/v1/outfits/suggest?userId=3&blueprintIndex=${blueprintIndex}`);
       if (response.ok) {
         const data = await response.json();
         // Java'dan gelen veriyi (resim url'lerini vs) state'e atıyoruz
@@ -84,7 +84,7 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
     };
 
     try {
-      await fetch('http://10.87.14.78:8080/api/v1/feedback', {
+      await fetch('http://172.30.55.25:8080/api/v1/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -95,15 +95,21 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
     }
   };
 
-  // 🛑 MODAL İÇİ MANTIKLAR
-  const handleReasonSelect = (reasonId: string) => {
-    // Eğer sebep spesifik eşya seçimi gerektiriyorsa (Referans görsellerindeki gibi)
-    if (['DONT_PAIR_THESE', 'TOO_WARM_FOR_WEATHER', 'TOO_COOL_FOR_WEATHER', 'EXCLUDE_SPECIFIC_ITEM'].includes(reasonId)) {
+const handleReasonSelect = (reasonId: string) => {
+    // 🚀 Alt Ekranı (Spesifik Eşya Seçimini) Açması Gereken Sebepler
+    const requiresItemSelection = [
+      'DONT_PAIR_THESE',        // Eşleştirme
+      'TOO_WARM_FOR_WEATHER',   // Çok Sıcak (Kışlık)
+      'TOO_COOL_FOR_WEATHER',   // Çok Soğuk (Yazlık)
+      'MISMATCHED_CATEGORIES'   // Kategoriler uymadı (Kullanıcı uyumsuz parçaları seçer)
+    ];
+
+    if (requiresItemSelection.includes(reasonId)) {
       setSelectedReasonCode(reasonId);
       setSelectedTargetItems([]); // Önceki seçimleri temizle
-      setFeedbackStep('SELECT_ITEMS'); // Alt ekrana geç
+      setFeedbackStep('SELECT_ITEMS'); // Alt ekrana geç!
     } else {
-      // Eşya seçimi gerektirmeyen bir sebepse (Örn: Mismatched Categories) direkt gönder
+      // Örn: COLOR_MISMATCH (Tüm kombini ilgilendiren sebepler direkt API'ye gider)
       executeDislike(reasonId, []);
     }
   };
@@ -221,8 +227,15 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
             {/* ADIM 2: SPESİFİK EŞYA SEÇİMİ (Referans Tasarıma Göre) */}
             {feedbackStep === 'SELECT_ITEMS' && (
               <>
-                <Text style={styles.sheetTitle}>Select items to exclude</Text>
-                <Text style={styles.sheetSubtitle}>The selected clothes won't show up according to your feedback.</Text>
+                <Text style={styles.sheetTitle}>
+                  {selectedReasonCode === 'TOO_WARM_FOR_WEATHER' ? "Select items that are too warm" :
+                   selectedReasonCode === 'TOO_COOL_FOR_WEATHER' ? "Select items that are too cool" :
+                   selectedReasonCode === 'MISMATCHED_CATEGORIES' ? "Select the mismatched items" :
+                   "Select items to exclude"}
+                </Text>
+                <Text style={styles.sheetSubtitle}>
+                  The selected clothes will be adjusted according to your feedback.
+                </Text>
                 
                 <ScrollView contentContainerStyle={styles.selectionGrid} showsVerticalScrollIndicator={false}>
                   {currentOutfit.map(item => {

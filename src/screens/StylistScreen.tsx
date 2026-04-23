@@ -65,7 +65,7 @@ export default function StylistScreen() {
     useCallback(() => {
       const fetchRealWardrobe = async () => {
         try {
-          const response = await fetch('http://10.87.14.78:8080/api/v1/clothes/3');
+          const response = await fetch('http://172.30.55.25:8080/api/v1/clothes/3');
           if (response.ok) {
             const data = await response.json();
             const formatted = data.map((item: any) => ({ 
