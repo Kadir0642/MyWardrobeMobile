@@ -7,26 +7,33 @@ import { useProfile } from '../context/ProfileContext';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
 
+// Merkezi API ve Tip Güvenliği İçe Aktarıldı
+import { apiClient } from '../api/client';
+import { ClothingItem } from '../types';
+
 const { width } = Dimensions.get('window');
 
+// Şimdilik test amaçlı User ID'mizi sabit tutalım, İleride Auth (Giriş) sistemine bağlanacak
+const CURRENT_USER_ID = 1; 
+
+// 🚀 Kategori ID'leri artık doğrudan Python AI'ın yolladığı (UPPERCASE) etiketlerle uyumlu
 const CATEGORIES = [
-  { id: 'all', label: 'All', icon: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=100' },
-  { id: 'Outerwear', label: 'Outerwear', icon: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=100' },
-  { id: 'Tops', label: 'Tops', icon: 'https://images.unsplash.com/photo-1554568218-0f1715e72254?w=100' },
-  { id: 'Bottoms', label: 'Bottoms', icon: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=100' },
-  { id: 'Footwear', label: 'Footwear', icon: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=100' },
-  { id: 'Accessories', label: 'Accessories', icon: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=100' },
-  { id: 'Full_body', label: 'Full body', icon: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=100' },
+  { id: 'ALL', label: 'All', icon: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=100' },
+  { id: 'OUTERWEAR', label: 'Outerwear', icon: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=100' },
+  { id: 'TOPS', label: 'Tops', icon: 'https://images.unsplash.com/photo-1554568218-0f1715e72254?w=100' },
+  { id: 'BOTTOMS', label: 'Bottoms', icon: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=100' },
+  { id: 'FULL BODY', label: 'Full Body', icon: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=100' }, // Yeni AI etiketimiz!
+  { id: 'FOOTWEAR', label: 'Footwear', icon: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=100' },
+  { id: 'ACCESSORIES', label: 'Accessories', icon: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=100' },
 ];
 
 const AnimatedInsiderButton = () => {
   const spinValue = useRef(new Animated.Value(0)).current;
-useEffect(() => {
+  useEffect(() => {
     const animation = Animated.loop(
       Animated.timing(spinValue, { toValue: 1, duration: 3000, easing: Easing.linear, useNativeDriver: true })
     );
     animation.start();
-    // Bileşen ekrandan gidince animasyonu durdur!
     return () => animation.stop(); 
   }, []);
   const spin = spinValue.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
@@ -44,14 +51,14 @@ export default function WardrobeScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const { profileImage } = useProfile();
   
-  const [activeCategory, setActiveCategory] = useState('all');
+  const [activeCategory, setActiveCategory] = useState('ALL');
   
-  // 🚀 YENİ MİMARİ: MASTER (Tüm Dolap) ve DİSPLAY (Ekranda Görünen)
-  const [masterItems, setMasterItems] = useState<any[]>([]); 
-  const [displayItems, setDisplayItems] = useState<any[]>([]); 
-  
+  // 🚀 ARTIK 'any' DEĞİL, KESİN TİPLİ (ClothingItem) DİZİLER!
+  const [masterItems, setMasterItems] = useState<ClothingItem[]>([]); 
+  const [displayItems, setDisplayItems] = useState<ClothingItem[]>([]); 
+ 
   // 🚀 NEW ETİKETİ KASASI (Asla silinmez, ta ki tıklanana kadar)
-  const [newItemIds, setNewItemIds] = useState<string[]>([]);
+  const [newItemIds, setNewItemIds] = useState<number[]>([]);
 
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'completed'>('idle');
   const [numColumns, setNumColumns] = useState(2); 
@@ -59,23 +66,17 @@ export default function WardrobeScreen({ navigation }: any) {
 
   const loadingProgress = useRef(new Animated.Value(0)).current;
 
-  // 1. JAVA'DAN TÜM DOLABI ÇEK (Sadece Refresh'te veya Geri Dönüşte çalışır)
+  // 1. JAVA'DAN TÜM DOLABI ÇEK (Axios ile temizlendi)
+// 1. JAVA'DAN TÜM DOLABI ÇEK
   const fetchWardrobe = async () => {
     try {
-      const response = await fetch('http://172.30.55.25:8080/api/v1/clothes/3');
-      if (response.ok) {
-        const data = await response.json();
-        const formattedItems = data.map((item: any) => ({
-          ...item,
-          id: item.id.toString(),
-          brand: item.brand || 'AI Processed', 
-          likes: item.wearCount || 0,
-          image: item.imageUrl,
-        }));
-        setMasterItems(formattedItems.reverse());
-      }
-    } catch (error) {
-      console.error("Veri çekme hatası: ", error);
+      const response = await apiClient.get(`/clothes/${CURRENT_USER_ID}`);
+      const items: ClothingItem[] = response.data.content || response.data; 
+      
+      setMasterItems(items.reverse()); 
+    } catch (error: any) {
+      // 🚀 RADAR EKLENDİ: Artık sadece "AxiosError" demeyecek, Java'nın fırlattığı gerçek hatayı (Örn: Type Mismatch) basacak!
+      console.error("🚨 Dolap verisi çekme hatası: ", error.response?.data || error.message);
     }
   };
 
@@ -91,31 +92,21 @@ export default function WardrobeScreen({ navigation }: any) {
     setRefreshing(false);
   }, []);
 
-  // 2. 🚀 IN-MEMORY FİLTRELEME MOTORU (Butona basıldığı an 0 saniyede çalışır)
+  // 2. IN-MEMORY FİLTRELEME MOTORU (Tam AI Uyumu)
   useEffect(() => {
-    if (activeCategory === 'all') {
+    if (activeCategory === 'ALL') {
       setDisplayItems(masterItems);
     } else {
-      // Hem tam eşleşmeyi (Kullanıcı seçtiyse) hem de AI'ın kaydettiği benzer isimleri yakala
       const filtered = masterItems.filter(item => {
-        const cat = item.category?.toLowerCase() || '';
-        const target = activeCategory.toLowerCase();
-        
-        // Eğer tam eşleşiyorsa
-        if (cat === target) return true;
-        
-        // AI Eşleştirmeleri (Fallback)
-        if (target === 'tops' && (cat.includes('shirt') || cat.includes('sweater') || cat.includes('hoodie'))) return true;
-        if (target === 'bottoms' && (cat.includes('pants') || cat.includes('skirt') || cat.includes('shorts'))) return true;
-        if (target === 'footwear' && (cat.includes('sneaker') || cat.includes('boot'))) return true;
-        
-        return false;
+        // AI zaten UPPERCASE kaydediyor, tam eşleşme arıyoruz
+        return item.category?.toUpperCase() === activeCategory;
       });
       setDisplayItems(filtered);
     }
-  }, [activeCategory, masterItems]); // Kategori değiştiğinde veya dolap güncellendiğinde tetiklenir
+  }, [activeCategory, masterItems]);
 
 
+  // ... Animasyon useEffect'i aynı kalıyor ...
   useEffect(() => {
     if (uploadStatus === 'uploading') {
       Animated.loop(Animated.sequence([
@@ -131,74 +122,73 @@ export default function WardrobeScreen({ navigation }: any) {
 
   const barWidth = loadingProgress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
+  // 🚀 AI YÜKLEME SÜRECİ (AXIOS İLE MERKEZİ VE TEMİZ)
   const pickAndUploadImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, quality: 0.8 });
 
     if (!result.canceled) {
       setUploadStatus('uploading'); 
       const imageUri = result.assets[0].uri;
+      
       const formData = new FormData();
       formData.append('image', { uri: imageUri, name: 'wardrobe_item.jpg', type: 'image/jpeg' } as any);
 
       try {
-        const extractResponse = await fetch('http://172.30.55.25:8080/api/v1/clothes/3/ai-extract', {
-          method: 'POST', body: formData, headers: { 'Accept': 'application/json' },
+        // Axios ile POST isteği
+        const extractResponse = await apiClient.post(`/clothes/${CURRENT_USER_ID}/ai-extract`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
         });
 
-        const extractData = await extractResponse.json();
-
-        if (extractResponse.ok && extractData.task_id) {
-          const taskId = extractData.task_id;
+        if (extractResponse.status === 202 || extractResponse.status === 200) {
+          const taskId = extractResponse.data.task_id;
+          
           const checkInterval = setInterval(async () => {
             try {
-              const statusResponse = await fetch(`http://172.30.55.25:8080/api/v1/clothes/3/ai-status/${taskId}`);
-              const statusData = await statusResponse.json();
+              const statusResponse = await apiClient.get(`/clothes/${CURRENT_USER_ID}/ai-status/${taskId}`);
+              const statusData = statusResponse.data;
 
               if (statusData.status === 'COMPLETED') {
                 clearInterval(checkInterval); 
-                const savedItems = statusData.saved_items;
                 
-                if (savedItems && savedItems.length > 0) {
-                   // 🚀 YENİ EKLENENLERİ KASAYA KAYDET
-                   const newIds = savedItems.map((i: any) => i.id.toString());
-                   setNewItemIds(prev => [...prev, ...newIds]);
-                   
-                   // Tüm dolabı yeniden çek ki ana listeye eklensinler
-                   await fetchWardrobe(); 
-                }
+                // Başarıyla kaydedildi, dolabı yenile
+                await fetchWardrobe(); 
                 
                 setUploadStatus('completed');
                 setTimeout(() => { setUploadStatus('idle'); }, 1500);
                 
               } else if (statusData.status === 'FAILURE') {
-                clearInterval(checkInterval); setUploadStatus('idle');
+                clearInterval(checkInterval); 
+                setUploadStatus('idle');
                 Alert.alert("Hata", "Yapay zeka kıyafeti işleyemedi.");
               }
             } catch (err) {
-               clearInterval(checkInterval); setUploadStatus('idle');
+               clearInterval(checkInterval); 
+               setUploadStatus('idle');
             }
           }, 3000); 
         } else {
-          Alert.alert('Hata', 'Sisteme ulaşılamadı.'); setUploadStatus('idle');
+          Alert.alert('Hata', 'Sisteme ulaşılamadı.'); 
+          setUploadStatus('idle');
         }
-      } catch (error) { setUploadStatus('idle'); }
+      } catch (error) { 
+        console.error("Yükleme Hatası:", error);
+        Alert.alert('Hata', 'Sunucuya bağlanılamadı.');
+        setUploadStatus('idle'); 
+      }
     }
   };
 
   const toggleGrid = () => { setNumColumns(numColumns === 2 ? 3 : 2); };
-
   const cardWidth = (width - 2) / numColumns; 
 
-  const handleItemPress = (clickedItem: any) => {
-    // 🚀 Tıklanan öğe kasadaysa (yeni ise), onu kasadan sil
+  const handleItemPress = (clickedItem: ClothingItem) => {
     if (newItemIds.includes(clickedItem.id)) {
       setNewItemIds(prev => prev.filter(id => id !== clickedItem.id));
     }
     navigation.navigate('ItemDetail', { item: clickedItem });
   };
 
-  const renderItem = ({ item }: any) => {
-    // Bu kıyafetin ID'si Yeni Kasasında var mı?
+  const renderItem = ({ item }: { item: ClothingItem }) => {
     const isNewItem = newItemIds.includes(item.id);
 
     return (
@@ -208,7 +198,7 @@ export default function WardrobeScreen({ navigation }: any) {
         style={[styles.cardContainer, { width: cardWidth }, isNewItem && styles.newCardBorder]}
       >
         <View style={styles.cardImageWrapper}>
-          <Image source={{ uri: item.image }} style={styles.cardImage} />
+          <Image source={{ uri: item.imageUrl }} style={styles.cardImage} />
           {isNewItem && (
             <View style={styles.newBadge}>
               <Text style={styles.newBadgeText}>NEW</Text>
@@ -216,11 +206,12 @@ export default function WardrobeScreen({ navigation }: any) {
           )}
           <View style={styles.likeContainer}>
             <Feather name="heart" size={18} color="#1A1A1A" />
-            {item.likes > 0 && <Text style={styles.likeText}>{item.likes}</Text>}
+            {item.wearCount > 0 && <Text style={styles.likeText}>{item.wearCount}</Text>}
           </View>
         </View>
         <View style={styles.cardFooter}>
-          <Text style={styles.brandText} numberOfLines={1}>{item.brand}</Text>
+          {/* Brand veya SubCategory gösterebiliriz */}
+          <Text style={styles.brandText} numberOfLines={1}>{item.brand || 'AI Item'}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -232,7 +223,7 @@ export default function WardrobeScreen({ navigation }: any) {
       {uploadStatus !== 'idle' && (
         <View style={[styles.loadingBanner, uploadStatus === 'completed' && { backgroundColor: '#E8F5E9' }]}>
           <Text style={[styles.loadingBannerText, uploadStatus === 'completed' && { color: '#2E7D32' }]}>
-            {uploadStatus === 'uploading' ? 'Uploading items ⏳' : 'Completed! 🦋'}
+            {uploadStatus === 'uploading' ? 'AI is processing items ⏳' : 'Completed! 🦋'}
           </Text>
           <View style={styles.loadingBarBackground}>
             <Animated.View style={[styles.loadingBarFill, { width: barWidth }, uploadStatus === 'completed' && { backgroundColor: '#4CAF50' }]} />
@@ -290,13 +281,13 @@ export default function WardrobeScreen({ navigation }: any) {
 
       <FlatList
         key={numColumns} 
-        data={displayItems} // 🚀 ARTIK FİLTRELENMİŞ LİSTEYİ GÖSTERİYORUZ
+        data={displayItems} 
         numColumns={numColumns}
-        keyExtractor={(item) => item.id}
-        initialNumToRender={6} // İlk başta sadece 6 tane çiz
-        maxToRenderPerBatch={4} // Kaydırdıkça 4'er 4'er çiz
-        windowSize={5} // Ekranda görünmeyen eski resimleri hafızadan sil (Çok Önemli!)
-        removeClippedSubviews={true} // Ekran dışı kalanları RAM'den düşür
+        keyExtractor={(item) => item.id.toString()}
+        initialNumToRender={6}
+        maxToRenderPerBatch={4}
+        windowSize={5} 
+        removeClippedSubviews={true} 
         renderItem={renderItem}
         contentContainerStyle={styles.gridContainer}
         showsVerticalScrollIndicator={false}
@@ -321,6 +312,7 @@ export default function WardrobeScreen({ navigation }: any) {
   );
 }
 
+// Stiller aynı kaldı
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F2EB' },
   loadingBanner: { backgroundColor: '#EBE8DF', paddingVertical: 8, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 1, borderColor: '#D1CFC7' },
@@ -360,7 +352,7 @@ const styles = StyleSheet.create({
   likeContainer: { position: 'absolute', top: 10, right: 10, alignItems: 'center' },
   likeText: { fontSize: 12, fontWeight: '700', color: '#1A1A1A', marginTop: 2 },
   cardFooter: { padding: 8, borderTopWidth: 1, borderColor: '#F0F0F0' },
-  brandText: { fontSize: 11, fontWeight: '700', color: '#888' },
+  brandText: { fontSize: 11, fontWeight: '700', color: '#888', textTransform: 'capitalize' },
   emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 50 },
   emptyText: { marginTop: 15, fontSize: 16, fontWeight: '600', color: '#888' },
   emptySubText: { marginTop: 5, fontSize: 13, color: '#AAA' },
