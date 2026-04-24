@@ -260,11 +260,11 @@ export default function WardrobeScreen({ navigation }: any) {
           </View>
         </View>
         <View style={styles.cardFooter}>
-          <Text style={styles.brandText} numberOfLines={1}>{item.brand || 'AI Item'}</Text> // Wardrobe ekranında kıyafetlerin markaları göstermek için " item.brand " yazılmalı
+          <Text style={styles.brandText} numberOfLines={1}>{item.brand || 'AI Item'}</Text> 
         </View>
       </TouchableOpacity>
     );
-  };
+  }; // Wardrobe ekranında kıyafetlerin markaları göstermek için " item.brand " yazılmalı
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
