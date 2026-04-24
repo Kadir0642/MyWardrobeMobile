@@ -8,11 +8,9 @@ import { StatusBar } from 'expo-status-bar';
 import { ProfileProvider } from './src/context/ProfileContext';
 import TabNavigator from './src/navigation/TabNavigator';
 import ItemDetailScreen from './src/screens/ItemDetailScreen';
+import PlannerScreen from './src/screens/PlannerScreen';
 
-// Asansör boşluğumuzu (Stack) oluşturuyoruz
 const Stack = createNativeStackNavigator();
-
-// npx expo start -c   ile başlatıyoruz
 
 export default function App() {
   return (
@@ -21,15 +19,27 @@ export default function App() {
         <NavigationContainer>
           
           <Stack.Navigator screenOptions={{ headerShown: false }}>
-            {/* 1. KAT: Uygulama açıldığında ilk burası görünür (Alt Menü ve İçindeki Sayfalar) */}
+            {/* 1. KAT: Ana Menü (Style, Wardrobe, Shop, Network, Profile) */}
             <Stack.Screen name="MainTabs" component={TabNavigator} />
             
-            {/* 2. KAT: Dolapta bir kıyafete tıklayınca üstüne açılacak olan Detay Sayfası! */}
+            {/* 2. KAT: Eşya Detay Sayfası */}
             <Stack.Screen 
               name="ItemDetail" 
               component={ItemDetailScreen} 
-              // iOS cihazlarda sayfanın şık bir kart gibi alttan yukarı kayarak açılmasını sağlar
               options={{ presentation: 'card' }} 
+            />
+
+            {/* 🚀 3. KAT: Tarih hapına tıklayınca açılacak olan Planlayıcı! */}
+            <Stack.Screen 
+              name="Planner" 
+              component={PlannerScreen} 
+              options={{ 
+                headerShown: true, 
+                title: 'Daily Planner',
+                headerBackTitle: '', // 🚀 HATA BURADAN ÇIKIYORDU! Native Stack için boş string kullanıyoruz.
+                headerTintColor: '#1A1A1A',
+                headerStyle: { backgroundColor: '#FAF9F4' },
+              }} 
             />
           </Stack.Navigator>
           

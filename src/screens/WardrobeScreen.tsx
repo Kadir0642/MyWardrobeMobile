@@ -11,8 +11,6 @@ import { apiClient } from '../api/client';
 import { ClothingItem } from '../types';
 
 const { width } = Dimensions.get('window');
-
-// r ile tüm uygulamayı baştan aşağı günceller
 const CURRENT_USER_ID = 1; 
 
 const CATEGORIES = [
@@ -49,17 +47,22 @@ export default function WardrobeScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const { profileImage } = useProfile();
   
+  // 🚀 ANA SEKMELER: 'ITEMS' veya 'OUTFITS'
+  const [mainTab, setMainTab] = useState<'ITEMS' | 'OUTFITS'>('ITEMS');
+
   const [activeCategory, setActiveCategory] = useState('ALL');
   
   const [masterItems, setMasterItems] = useState<ClothingItem[]>([]); 
   const [displayItems, setDisplayItems] = useState<ClothingItem[]>([]); 
   
+  // 🚀 OUTFITS (Kombinler) için State
+  const [outfits, setOutfits] = useState<any[]>([]);
+
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItemsCount, setTotalItemsCount] = useState(0); 
   const [isLoadingMore, setIsLoadingMore] = useState(false); 
   
-  // 🚀 NEON SARI KASAMIZ GERİ DÖNDÜ!
   const [newItemIds, setNewItemIds] = useState<number[]>([]);
   
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'completed'>('idle');
@@ -68,16 +71,13 @@ export default function WardrobeScreen({ navigation }: any) {
 
   const loadingProgress = useRef(new Animated.Value(0)).current;
 
-  // 1. JAVA'DAN DOLABI ÇEK (NEON IŞIKLARI YAKMA DESTEKLİ)
+  // 1. JAVA'DAN DOLABI ÇEK
   const fetchWardrobe = async (page = 0, isRefresh = false) => {
     if (isLoadingMore) return; 
-
     try {
       if (page > 0) setIsLoadingMore(true);
 
-      // 🚀 DİKKAT: &sort=id,desc eklendi! En yeni kıyafetler hep en üstte (sayfa 0'da) gelecek!
       const response = await apiClient.get(`/clothes/${CURRENT_USER_ID}?page=${page}&size=20&sort=id,desc`);
-      
       const responseData = response.data;
       const itemsArray: ClothingItem[] = responseData.content ? responseData.content : (Array.isArray(responseData) ? responseData : []);
 
@@ -94,8 +94,6 @@ export default function WardrobeScreen({ navigation }: any) {
       }
       
       setCurrentPage(page);
-      
-      // 🚀 Yeni eklenenleri bulmak için listeyi dışarı gönderiyoruz
       return itemsArray; 
 
     } catch (error: any) {
@@ -105,20 +103,39 @@ export default function WardrobeScreen({ navigation }: any) {
     }
   };
 
+// 🚀 2. YENİ: JAVA'DAN KAYDEDİLEN KOMBİNLERİ (OUTFITS) ÇEK
+  const fetchOutfits = async () => {
+    try {
+      const response = await apiClient.get(`/outfits/user/${CURRENT_USER_ID}`);
+      
+      // 🚀 SİHİRLİ DOKUNUŞ: Spring Boot "Page" döndüğü için asıl liste "content" içindedir!
+      const outfitsArray = response.data.content ? response.data.content : response.data;
+      
+      setOutfits(outfitsArray);
+    } catch (error: any) {
+      console.error("🚨 Kombinler çekilemedi: ", error.message);
+    }
+  };
+
   useFocusEffect(
     useCallback(() => {
       fetchWardrobe(0, true);
+      fetchOutfits(); // Ekrana her gelindiğinde kombinleri de tazele
     }, [])
   );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchWardrobe(0, true);
+    if (mainTab === 'ITEMS') {
+      await fetchWardrobe(0, true);
+    } else if (mainTab === 'OUTFITS') {
+      await fetchOutfits();
+    }
     setRefreshing(false);
-  }, []);
+  }, [mainTab]);
 
   const loadMoreItems = () => {
-    if (currentPage < totalPages - 1 && !isLoadingMore) {
+    if (mainTab === 'ITEMS' && currentPage < totalPages - 1 && !isLoadingMore) {
       fetchWardrobe(currentPage + 1, false);
     }
   };
@@ -150,7 +167,6 @@ export default function WardrobeScreen({ navigation }: any) {
 
   const barWidth = loadingProgress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
-  // 🚀 AI YÜKLEME SÜRECİ VE NEON ZIRH GİYDİRME
   const pickAndUploadImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({ 
       mediaTypes: ['images'], 
@@ -164,7 +180,6 @@ export default function WardrobeScreen({ navigation }: any) {
       setUploadStatus('uploading'); 
       let successCount = 0; 
       
-      // 🚀 Yükleme başlamadan önceki dolap hafızası (Dedektiflik için)
       const existingIdsBeforeUpload = new Set(masterItems.map(i => i.id));
 
       for (let i = 0; i < result.assets.length; i++) {
@@ -201,11 +216,9 @@ export default function WardrobeScreen({ navigation }: any) {
       }
 
       if (successCount > 0) {
-        // 🚀 İşlem bitti, dolabı en baştan taze taze çek!
         const freshItems = await fetchWardrobe(0, true); 
         
         if (freshItems) {
-          // 🚀 Eski dolapta OLMAYAN yeni eklenmiş kıyafetlerin ID'lerini bul (Zırh giydir)
           const newlyAddedIds = freshItems
             .filter((item: ClothingItem) => !existingIdsBeforeUpload.has(item.id))
             .map((item: ClothingItem) => item.id);
@@ -229,26 +242,24 @@ export default function WardrobeScreen({ navigation }: any) {
   const cardWidth = (width - 2) / numColumns; 
 
   const handleItemPress = (clickedItem: ClothingItem) => {
-    // 🚀 Neon yazıyı ve çerçeveyi söndürme mantığı
     if (newItemIds.includes(clickedItem.id)) {
       setNewItemIds(prev => prev.filter(id => id !== clickedItem.id));
     }
     navigation.navigate('ItemDetail', { item: clickedItem });
   };
 
+  // 👗 1. EŞYA KARTI TASARIMI
   const renderItem = ({ item }: { item: ClothingItem }) => {
-    const isNewItem = newItemIds.includes(item.id); // Neon zırhını kontrol et
+    const isNewItem = newItemIds.includes(item.id); 
 
     return (
       <TouchableOpacity 
         activeOpacity={0.9} 
         onPress={() => handleItemPress(item)}
-        // 🚀 Eğer isNewItem "True" ise sarı sınır çizgisini (newCardBorder) aktif et
         style={[styles.cardContainer, { width: cardWidth }, isNewItem && styles.newCardBorder]}
       >
         <View style={styles.cardImageWrapper}>
           <Image source={{ uri: item.imageUrl }} style={styles.cardImage} />
-          {/* 🚀 Eğer isNewItem "True" ise sol üste neon "NEW" kutucuğunu bas */}
           {isNewItem && (
             <View style={styles.newBadge}>
               <Text style={styles.newBadgeText}>NEW</Text>
@@ -264,7 +275,44 @@ export default function WardrobeScreen({ navigation }: any) {
         </View>
       </TouchableOpacity>
     );
-  }; // Wardrobe ekranında kıyafetlerin markaları göstermek için " item.brand " yazılmalı
+  };
+
+// 🦋 2. OUTFIT (KOMBİN) KARTI TASARIMI (4 Parçalı Grid)
+  const renderOutfit = ({ item }: { item: any }) => {
+    // 🚀 DÜZELTME: Java DTO'sundan gelen liste adı "clothes", "items" değil!
+    const clothesArray = item.clothes || [];
+    const itemsToShow = clothesArray.slice(0, 4);
+
+    return (
+      <TouchableOpacity activeOpacity={0.9} style={styles.outfitCard}>
+        <View style={styles.outfitImageGrid}>
+          {itemsToShow.map((outfitItem: any, index: number) => (
+            <View key={index} style={styles.outfitGridCell}>
+               <Image source={{ uri: outfitItem.imageUrl }} style={styles.outfitGridImage} />
+            </View>
+          ))}
+          
+          {/* Eğer kombinde 4'ten fazla eşya varsa son kareye "+X" yazısı ekle */}
+          {clothesArray.length > 4 && (
+            <View style={styles.moreItemsOverlay}>
+              <Text style={styles.moreItemsText}>+{clothesArray.length - 4}</Text>
+            </View>
+          )}
+        </View>
+        
+        <View style={styles.outfitFooter}>
+          {/* İsim varsa ismi göster, yoksa tarihi göster */}
+          <Text style={styles.outfitDateText} numberOfLines={1}>
+            {item.name || "Kombinim"}
+          </Text>
+          <View style={styles.outfitActionRow}>
+             <MaterialCommunityIcons name="hanger" size={18} color="#888" />
+             <Text style={styles.outfitItemCount}>{clothesArray.length} parça</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -297,76 +345,113 @@ export default function WardrobeScreen({ navigation }: any) {
       </View>
 
       <View style={styles.tabsRow}>
-        <TouchableOpacity style={styles.tabItem}>
-          <Text style={styles.tabTitle}>ITEMS</Text>
+        {/* 🚀 ITEMS SEKMESİ ŞALTERİ */}
+        <TouchableOpacity 
+          style={[styles.tabItem, mainTab === 'ITEMS' && styles.tabItemActive]} 
+          onPress={() => setMainTab('ITEMS')}
+        >
+          <Text style={[styles.tabTitle, mainTab === 'ITEMS' && styles.tabTitleActive]}>ITEMS</Text>
           <Text style={styles.tabCount}>({totalItemsCount})</Text> 
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.tabItem, styles.tabCenterBorder]}>
-          <Text style={styles.tabTitle}>OUTFITS</Text>
-          <Text style={styles.tabCount}>(0)</Text>
+        
+        {/* 🚀 OUTFITS SEKMESİ ŞALTERİ */}
+        <TouchableOpacity 
+          style={[styles.tabItem, styles.tabCenterBorder, mainTab === 'OUTFITS' && styles.tabItemActive]}
+          onPress={() => setMainTab('OUTFITS')}
+        >
+          <Text style={[styles.tabTitle, mainTab === 'OUTFITS' && styles.tabTitleActive]}>OUTFITS</Text>
+          <Text style={styles.tabCount}>({outfits.length})</Text>
         </TouchableOpacity>
+        
         <TouchableOpacity style={styles.tabItem}>
           <Text style={styles.tabTitle}>LOOKBOOKS</Text>
           <Text style={styles.tabCount}>(0)</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.categoriesRow}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesScroll}>
-          {CATEGORIES.map((cat) => (
-            <TouchableOpacity key={cat.id} style={styles.categoryCircleWrapper} onPress={() => setActiveCategory(cat.id)}>
-              <View style={[styles.categoryCircle, activeCategory === cat.id && styles.categoryCircleActive]}>
-                <Image source={{ uri: cat.icon }} style={styles.categoryIcon} />
-              </View>
-              <Text style={[styles.categoryLabel, activeCategory === cat.id && styles.categoryLabelActive]}>{cat.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-        <View style={styles.filterIconsBox}>
-          <Feather name="heart" size={24} color="#1A1A1A" style={{ marginRight: 15 }} />
-          <Feather name="sliders" size={24} color="#1A1A1A" />
-        </View>
-      </View>
-
-      <FlatList
-        key={numColumns} 
-        data={displayItems} 
-        numColumns={numColumns}
-        keyExtractor={(item) => item.id.toString()}
-        initialNumToRender={6}
-        maxToRenderPerBatch={4}
-        windowSize={5} 
-        removeClippedSubviews={true} 
-        renderItem={renderItem}
-        contentContainerStyle={styles.gridContainer}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#E07A5F" />}
-        
-        onEndReached={loadMoreItems} 
-        onEndReachedThreshold={0.5}  
-        ListFooterComponent={        
-          isLoadingMore ? (
-            <View style={{ paddingVertical: 20 }}>
-              <ActivityIndicator size="small" color="#E07A5F" />
-            </View>
-          ) : null
-        }
-
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Feather name="inbox" size={48} color="#D1CFC7" />
-            <Text style={styles.emptyText}>Bu kategoride ürün bulunamadı.</Text>
+      {/* ITEMS (Eşyalar) SEÇİLİYSE KATEGORİLERİ GÖSTER */}
+      {mainTab === 'ITEMS' && (
+        <View style={styles.categoriesRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesScroll}>
+            {CATEGORIES.map((cat) => (
+              <TouchableOpacity key={cat.id} style={styles.categoryCircleWrapper} onPress={() => setActiveCategory(cat.id)}>
+                <View style={[styles.categoryCircle, activeCategory === cat.id && styles.categoryCircleActive]}>
+                  <Image source={{ uri: cat.icon }} style={styles.categoryIcon} />
+                </View>
+                <Text style={[styles.categoryLabel, activeCategory === cat.id && styles.categoryLabelActive]}>{cat.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <View style={styles.filterIconsBox}>
+            <Feather name="heart" size={24} color="#1A1A1A" style={{ marginRight: 15 }} />
+            <Feather name="sliders" size={24} color="#1A1A1A" />
           </View>
-        }
-      />
+        </View>
+      )}
 
-      <TouchableOpacity style={styles.gridToggleBtn} activeOpacity={0.8} onPress={toggleGrid}>
-        <Feather name={numColumns === 2 ? "grid" : "columns"} size={20} color="#1A1A1A" />
-      </TouchableOpacity>
+      {/* 🚀 EKRAN YÖNETİCİSİ: ITEM LİSTESİ Mİ, OUTFIT LİSTESİ Mİ? */}
+      {mainTab === 'ITEMS' ? (
+        <FlatList
+          key={`items-${numColumns}`} 
+          data={displayItems} 
+          numColumns={numColumns}
+          keyExtractor={(item) => item.id.toString()}
+          initialNumToRender={6}
+          maxToRenderPerBatch={4}
+          windowSize={5} 
+          removeClippedSubviews={true} 
+          renderItem={renderItem}
+          contentContainerStyle={styles.gridContainer}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#E07A5F" />}
+          onEndReached={loadMoreItems} 
+          onEndReachedThreshold={0.5}  
+          ListFooterComponent={        
+            isLoadingMore ? (
+              <View style={{ paddingVertical: 20 }}>
+                <ActivityIndicator size="small" color="#E07A5F" />
+              </View>
+            ) : null
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Feather name="inbox" size={48} color="#D1CFC7" />
+              <Text style={styles.emptyText}>Bu kategoride ürün bulunamadı.</Text>
+            </View>
+          }
+        />
+      ) : (
+        // 🚀 OUTFITS (KOMBİNLER) LİSTESİ
+        <FlatList
+          key="outfits-2" 
+          data={outfits} 
+          numColumns={2}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={renderOutfit}
+          contentContainerStyle={styles.outfitListContainer}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#E07A5F" />}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <MaterialCommunityIcons name="hanger" size={56} color="#D1CFC7" />
+              <Text style={styles.emptyText}>Henüz bir kombin kaydetmediniz.</Text>
+              <Text style={styles.emptySubText}>AI Suggestions'tan veya Canvas'tan kombin oluşturun!</Text>
+            </View>
+          }
+        />
+      )}
 
-      <TouchableOpacity style={styles.aiUploadButton} activeOpacity={0.9} onPress={pickAndUploadImage}>
-        <Feather name="plus" size={36} color="#E07A5F" />
-      </TouchableOpacity>
+      {/* Grid değiştirme ve AI Yükleme Butonu (Sadece Items Sekmesinde Göster) */}
+      {mainTab === 'ITEMS' && (
+        <>
+          <TouchableOpacity style={styles.gridToggleBtn} activeOpacity={0.8} onPress={toggleGrid}>
+            <Feather name={numColumns === 2 ? "grid" : "columns"} size={20} color="#1A1A1A" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.aiUploadButton} activeOpacity={0.9} onPress={pickAndUploadImage}>
+            <Feather name="plus" size={36} color="#E07A5F" />
+          </TouchableOpacity>
+        </>
+      )}
 
     </View>
   );
@@ -387,11 +472,15 @@ const styles = StyleSheet.create({
   rotatingGradient: { position: 'absolute', width: 150, height: 150 },
   insiderInner: { width: 94, height: 30, backgroundColor: '#F5F2EB', justifyContent: 'center', alignItems: 'center', borderRadius: 15 },
   insiderText: { fontSize: 13, fontWeight: '700', letterSpacing: 1, color: '#1A1A1A' },
+  
   tabsRow: { flexDirection: 'row', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#D1CFC7', backgroundColor: '#F5F2EB' },
   tabItem: { flex: 1, alignItems: 'center', paddingVertical: 10 },
+  tabItemActive: { backgroundColor: '#EBE8DF' }, // 🚀 Aktif sekme için hafif karartma
   tabCenterBorder: { borderLeftWidth: 1, borderRightWidth: 1, borderColor: '#D1CFC7' },
-  tabTitle: { fontSize: 14, fontWeight: '600', color: '#1A1A1A' },
+  tabTitle: { fontSize: 14, fontWeight: '600', color: '#888' },
+  tabTitleActive: { color: '#1A1A1A', fontWeight: '800' }, // 🚀 Aktif sekme yazısı koyu siyah
   tabCount: { fontSize: 14, color: '#666', marginTop: 2 },
+  
   categoriesRow: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: '#D1CFC7', backgroundColor: '#EBE8DF' },
   categoriesScroll: { paddingVertical: 10, paddingLeft: 10 },
   categoryCircleWrapper: { alignItems: 'center', marginRight: 15 },
@@ -401,10 +490,10 @@ const styles = StyleSheet.create({
   categoryLabel: { fontSize: 10, fontWeight: '600', color: '#666', marginTop: 4 },
   categoryLabelActive: { color: '#1A1A1A', fontWeight: '800' },
   filterIconsBox: { flexDirection: 'row', paddingHorizontal: 15, height: '100%', alignItems: 'center', borderLeftWidth: 1, borderColor: '#D1CFC7', backgroundColor: '#F5F2EB' },
+  
   gridContainer: { paddingBottom: 100 }, 
   cardContainer: { margin: 1, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderRightWidth: 1, borderColor: '#D1CFC7' },
   
-  // 🚀 İŞTE SENİN NEON SARI STİLLERİN BURADA!
   newCardBorder: { borderColor: '#DFFF00', borderWidth: 2 },
   newBadge: { position: 'absolute', top: 8, left: 8, backgroundColor: '#DFFF00', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4, zIndex: 10 },
   newBadgeText: { fontSize: 9, fontWeight: '900', color: '#1A1A1A', letterSpacing: 0.5 },
@@ -415,9 +504,81 @@ const styles = StyleSheet.create({
   likeText: { fontSize: 12, fontWeight: '700', color: '#1A1A1A', marginTop: 2 },
   cardFooter: { padding: 8, borderTopWidth: 1, borderColor: '#F0F0F0' },
   brandText: { fontSize: 11, fontWeight: '700', color: '#888', textTransform: 'capitalize' },
+  
   emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 50 },
   emptyText: { marginTop: 15, fontSize: 16, fontWeight: '600', color: '#888' },
-  emptySubText: { marginTop: 5, fontSize: 13, color: '#AAA' },
+  emptySubText: { marginTop: 5, fontSize: 13, color: '#AAA', textAlign: 'center', paddingHorizontal: 20 },
+  
   gridToggleBtn: { position: 'absolute', bottom: 105, right: 30, width: 44, height: 44, borderRadius: 22, backgroundColor: '#F5F2EB', borderWidth: 1, borderColor: '#D1CFC7', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
-  aiUploadButton: { position: 'absolute', bottom: 30, right: 20, width: 64, height: 64, borderRadius: 32, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#E07A5F', justifyContent: 'center', alignItems: 'center', shadowColor: '#E07A5F', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 }
+  aiUploadButton: { position: 'absolute', bottom: 30, right: 20, width: 64, height: 64, borderRadius: 32, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#E07A5F', justifyContent: 'center', alignItems: 'center', shadowColor: '#E07A5F', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
+
+  // 🦋 YENİ OUTFIT (KOMBİN) STİLLERİ
+  outfitListContainer: { padding: 10, paddingBottom: 100 },
+  outfitCard: { 
+    width: (width / 2) - 15, 
+    margin: 5, 
+    backgroundColor: '#FFFFFF', 
+    borderRadius: 16, 
+    overflow: 'hidden', 
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 4 }, 
+    shadowOpacity: 0.05, 
+    shadowRadius: 8, 
+    elevation: 3 
+  },
+  outfitImageGrid: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    width: '100%', 
+    aspectRatio: 1, // Kare tasarım
+    backgroundColor: '#FAFAFA' 
+  },
+  outfitGridCell: { 
+    width: '50%', 
+    height: '50%', 
+    padding: 2, 
+    borderWidth: 0.5, 
+    borderColor: '#F0F0F0' 
+  },
+  outfitGridImage: { 
+    width: '100%', 
+    height: '100%', 
+    resizeMode: 'contain' 
+  },
+  moreItemsOverlay: { 
+    position: 'absolute', 
+    bottom: 2, 
+    right: 2, 
+    width: '49%', 
+    height: '49%', 
+    backgroundColor: 'rgba(0,0,0,0.6)', 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  moreItemsText: { 
+    color: '#FFF', 
+    fontSize: 16, 
+    fontWeight: '800' 
+  },
+  outfitFooter: { 
+    padding: 12, 
+    borderTopWidth: 1, 
+    borderColor: '#F5F5F5' 
+  },
+  outfitDateText: { 
+    fontSize: 12, 
+    fontWeight: '700', 
+    color: '#1A1A1A', 
+    marginBottom: 4 
+  },
+  outfitActionRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 4 
+  },
+  outfitItemCount: { 
+    fontSize: 11, 
+    color: '#888', 
+    fontWeight: '600' 
+  }
 });

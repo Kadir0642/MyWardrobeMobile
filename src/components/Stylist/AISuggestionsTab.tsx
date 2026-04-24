@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Image, Modal, ScrollView, Dimensions, ActivityIndicator, Animated, PanResponder } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Image, Modal, ScrollView, Dimensions, ActivityIndicator, Animated, PanResponder, Alert } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { apiClient } from '../../api/client';
@@ -43,8 +43,10 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
   const [selectedReasonCode, setSelectedReasonCode] = useState<string>('NONE');
   const [selectedTargetItems, setSelectedTargetItems] = useState<number[]>([]);
 
-  // 🚀 YENİ: KAYDIRARAK KAPATILABİLEN MODAL (BOTTOM SHEET) FİZİĞİ
   const sheetPanY = useRef(new Animated.Value(height)).current;
+  
+  // 🚀 UX DETAYI: LIKE Butonu Kalp Atış Animasyonu
+  const likeScale = useRef(new Animated.Value(1)).current;
 
   const openFeedbackModal = () => {
     setFeedbackVisible(true);
@@ -65,24 +67,22 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
       setTimeout(() => {
         setFeedbackStep('REASON');
         setSelectedTargetItems([]);
-      }, 100); // UI titrememesi için küçük gecikme
+      }, 100); 
     });
   };
 
   const feedbackPanResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gesture) => gesture.dy > 10 && gesture.vy > 0.1, // Sadece aşağı kaydırmayı algıla
+      onMoveShouldSetPanResponder: (_, gesture) => gesture.dy > 10 && gesture.vy > 0.1, 
       onPanResponderMove: (_, gesture) => {
         if (gesture.dy > 0) {
-          sheetPanY.setValue(gesture.dy); // Parmağa göre tepsiyi aşağı çek
+          sheetPanY.setValue(gesture.dy); 
         }
       },
       onPanResponderRelease: (_, gesture) => {
-        // Eğer hızlıca aşağı kaydırıldıysa veya %25'ten fazla çekildiyse KAPAT
         if (gesture.dy > height * 0.25 || gesture.vy > 1.2) {
           closeFeedbackModal();
         } else {
-          // Aksi halde geri yukarı zıpla
           Animated.spring(sheetPanY, { toValue: 0, bounciness: 4, useNativeDriver: true }).start();
         }
       }
@@ -153,6 +153,28 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
     }
   };
 
+// 🚀 GÜNCELLENMİŞ OUTFIT KAYDETME MOTORU
+  const saveOutfitToDatabase = async (outfitItems: any[]) => {
+    if (outfitItems.length === 0) return;
+    try {
+      const safeItemIds = outfitItems
+        .map(item => parseInt(item.id, 10))
+        .filter(id => !isNaN(id) && id > 0);
+
+      // 📦 Java DTO'sunun tam olarak beklediği paket (name ve clothingItemIds)
+      const payload = {
+        name: `AI Suggestion - ${new Date().toLocaleDateString('tr-TR')}`, // Java isim bekliyor!
+        clothingItemIds: safeItemIds, 
+      };
+
+      // 📍 Java'nın beklediği tam adres: /outfits/{userId}/save
+      await apiClient.post(`/outfits/${CURRENT_USER_ID}/save`, payload);
+      console.log("✨ Kombin dolaba başarıyla kaydedildi!");
+    } catch (error: any) {
+      console.error("🚨 Kombin kaydedilirken hata:", error.message);
+    }
+  }
+
   const handleReasonSelect = (reasonId: string) => {
     const requiresItemSelection = [
       'DONT_PAIR_THESE',        
@@ -180,14 +202,26 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
   };
 
   const executeDislike = (reason: string, targets: number[]) => {
-    closeFeedbackModal(); // YENİ KAPATMA METODU
+    closeFeedbackModal(); 
     sendFeedbackToAPI('DISLIKE', reason, targets); 
     fetchOutfitFromAPI(activeBlueprintIndex); 
   };
 
+  // 🚀 LIKE BUTONU ARTIK HEM KAYDEDİYOR HEM ANİMASYON YAPIYOR
   const handleLike = () => {
-    sendFeedbackToAPI('LIKE', 'NONE', []); 
-    fetchOutfitFromAPI(activeBlueprintIndex); 
+    // 1. Kullanıcıya "Basıldı" hissi vermek için kalbi şişir
+    Animated.sequence([
+      Animated.timing(likeScale, { toValue: 1.4, duration: 150, useNativeDriver: true }),
+      Animated.timing(likeScale, { toValue: 1, duration: 150, useNativeDriver: true })
+    ]).start(() => {
+      // 2. Animasyon bitince asıl işlemleri yap
+      sendFeedbackToAPI('LIKE', 'NONE', []); 
+      saveOutfitToDatabase(currentOutfit); // OUTFITS sekmesi için kaydet
+      
+      Alert.alert("Harika Seçim! 💖", "Kombin dolabına kaydedildi.", [
+        { text: "Sıradaki", onPress: () => fetchOutfitFromAPI(activeBlueprintIndex) }
+      ]);
+    });
   };
 
   const currentPositions = getCollagePositions(currentOutfit.length);
@@ -236,28 +270,29 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
       </View>
 
       <View style={styles.aiActionRow}>
-         <TouchableOpacity style={styles.aiActionBtnDislike} onPress={openFeedbackModal}>
+         <TouchableOpacity style={styles.aiActionBtnDislike} onPress={openFeedbackModal} activeOpacity={0.8}>
            <Feather name="x" size={32} color="#FF3B30" />
          </TouchableOpacity>
          
-         <TouchableOpacity style={styles.aiActionBtnNext} onPress={() => fetchOutfitFromAPI(activeBlueprintIndex)}>
+         <TouchableOpacity style={styles.aiActionBtnNext} onPress={() => fetchOutfitFromAPI(activeBlueprintIndex)} activeOpacity={0.7}>
            <MaterialCommunityIcons name="butterfly-outline" size={36} color="#1A1A1A" />
            <Text style={styles.aiNextText}>Next Outfit</Text>
          </TouchableOpacity>
          
-         <TouchableOpacity style={styles.aiActionBtnLike} onPress={handleLike}>
-           <MaterialCommunityIcons name="heart" size={32} color="#34C759" />
+         <TouchableOpacity style={styles.aiActionBtnLike} onPress={handleLike} activeOpacity={0.9}>
+           {/* 🚀 ANİMASYONLU KALP */}
+           <Animated.View style={{ transform: [{ scale: likeScale }] }}>
+             <MaterialCommunityIcons name="heart" size={32} color="#34C759" />
+           </Animated.View>
          </TouchableOpacity>
       </View>
 
       {/* 🛑 KAYDIRILABİLİR BOTTOM SHEET (MODAL) */}
       <Modal visible={isFeedbackVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          {/* Arka plana tıklandığında da kapansın istersen diye görünmez bir buton */}
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={closeFeedbackModal} />
           
           <Animated.View style={[styles.bottomSheet, { transform: [{ translateY: sheetPanY }] }]}>
-            {/* Sadece bu üst kısımdan (Handle) tutarak aşağı sürüklenmesini sağlıyoruz */}
             <View style={{ width: '100%', paddingVertical: 10 }} {...feedbackPanResponder.panHandlers}>
               <View style={styles.sheetHandle} />
             </View>
@@ -359,7 +394,6 @@ const styles = StyleSheet.create({
   aiNextText: { fontSize: 12, color: '#1A1A1A', fontWeight: '700', marginTop: 8 },
   
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  // YENİ: bottomSheet artık en alttan başlayıp tam oturuyor
   bottomSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingHorizontal: 25, paddingBottom: 40, maxHeight: height * 0.8, shadowColor: '#000', shadowOffset: { width: 0, height: -5 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 20 },
   sheetHandle: { width: 50, height: 6, backgroundColor: '#E0E0E0', borderRadius: 3, alignSelf: 'center' },
   sheetSubtitle: { fontSize: 13, color: '#888', textAlign: 'center', fontWeight: '500', marginBottom: 5 },

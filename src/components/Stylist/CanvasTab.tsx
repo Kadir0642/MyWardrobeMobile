@@ -2,7 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Dimensions, Animated, PanResponder, Image, Alert, TouchableWithoutFeedback, ScrollView } from 'react-native';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
+// 🚀 API BAĞLANTISI EKLENDİ (Bunu unutmuştuk!)
+import { apiClient } from '../../api/client';
+
 const { width, height } = Dimensions.get('window');
+const CURRENT_USER_ID = 1;
 
 // 🚀 KURŞUN GEÇİRMEZ, 60 FPS DRAGGABLE BİLEŞENİ
 const DraggableItem = ({ item, isSelected, onSelect }: any) => {
@@ -10,7 +14,7 @@ const DraggableItem = ({ item, isSelected, onSelect }: any) => {
   const scale = useRef(new Animated.Value(1)).current;
   const rotation = useRef(new Animated.Value(0)).current;
 
-  // 1. GÜVENLİ TAKİP MERKEZİ (Donmaları %100 Engelleyen Çözüm)
+  // 1. GÜVENLİ TAKİP MERKEZİ
   const panVal = useRef({ x: 0, y: 0 });
   const scaleVal = useRef(1);
   const rotVal = useRef(0);
@@ -33,7 +37,7 @@ const DraggableItem = ({ item, isSelected, onSelect }: any) => {
   const startRot = useRef(0);
   const isMultiTouch = useRef(false);
 
-  // 2. İKİ PARMAKLA (BÜYÜTME & DÖNDÜRME) VE TEK PARMAKLA TAŞIMA
+  // 2. İKİ PARMAKLA VE TEK PARMAKLA TAŞIMA
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -41,7 +45,6 @@ const DraggableItem = ({ item, isSelected, onSelect }: any) => {
       onPanResponderGrant: () => {
         if (onSelect) onSelect(item.id);
         
-        // Kaldığı yerden pürüzsüzce devam etmesi için güvenli değerleri atıyoruz
         pan.setOffset({ x: panVal.current.x, y: panVal.current.y });
         pan.setValue({ x: 0, y: 0 });
         
@@ -54,29 +57,26 @@ const DraggableItem = ({ item, isSelected, onSelect }: any) => {
         const touches = evt.nativeEvent.touches;
         
         if (touches.length >= 2) {
-          isMultiTouch.current = true; // Çoklu dokunma kalkanı aktif
+          isMultiTouch.current = true;
           const dx = touches[0].pageX - touches[1].pageX;
           const dy = touches[0].pageY - touches[1].pageY;
           const dist = Math.sqrt(dx * dx + dy * dy);
           const angle = Math.atan2(dy, dx) * (180 / Math.PI);
 
           if (initialDist.current === 0) {
-            initialDist.current = dist || 1; // 0'a bölünme (çökme) hatasını önler
+            initialDist.current = dist || 1;
             initialAngle.current = angle;
           } else {
-            // BOYUTLANDIRMA (Scale)
             let s = startScale.current * (dist / initialDist.current);
-            s = Math.max(0.4, Math.min(s, 4.0)); // Çok küçülmesini ve çok büyümesini engeller
+            s = Math.max(0.4, Math.min(s, 4.0)); 
             scale.setValue(s);
 
-            // DÖNDÜRME (Rotate) - Ters açılarda takılmayı önleyen yumuşatıcı
             let aDiff = angle - initialAngle.current;
             if (aDiff > 180) aDiff -= 360;
             if (aDiff < -180) aDiff += 360;
             rotation.setValue(startRot.current + aDiff);
           }
         } else if (touches.length === 1) {
-          // TEK PARMAK (Sadece iki parmaktan tek parmağa aniden düşmediyse çalışır)
           if (!isMultiTouch.current) {
             pan.setValue({ x: gestureState.dx, y: gestureState.dy });
           }
@@ -105,14 +105,12 @@ const DraggableItem = ({ item, isSelected, onSelect }: any) => {
         startRot.current = rotVal.current;
       },
       onPanResponderMove: (evt, gestureState) => {
-        // İkonu sağa-sola sürükledikçe yağ gibi döner
         rotation.setValue(startRot.current + gestureState.dx);
       },
       onPanResponderRelease: () => {}
     })
   ).current;
 
-  // Sayısal değeri dereceye (String'e) çeviren React Native animasyon köprüsü
   const rotateStr = rotation.interpolate({
     inputRange: [-36000, 36000],
     outputRange: ['-36000deg', '36000deg']
@@ -123,7 +121,6 @@ const DraggableItem = ({ item, isSelected, onSelect }: any) => {
       style={[
         styles.draggableBox,
         { top: item.y, left: item.x, zIndex: item.zIndex },
-        // Bütün şov burada: X/Y hareketi, Büyüme, Dönme hepsi tek satırda birleşti!
         { transform: [{ translateX: pan.x }, { translateY: pan.y }, { scale: scale }, { rotate: rotateStr }] }
       ]}
       {...panResponder.panHandlers}
@@ -192,9 +189,9 @@ export default function CanvasTab({ allWardrobe }: CanvasTabProps) {
         const currentY = (trayTranslateY as any)._value;
 
         let snapTo = 0;
-        if (currentY > TRAY_HEIGHT * 0.7 || gesture.vy > 1.5) {
+        if (currentY > TRAY_HEIGHT * 0.45 || gesture.vy > 0.8) {
           snapTo = TRAY_HEIGHT; 
-        } else if (currentY > TRAY_HEIGHT * 0.2 || gesture.vy > 0.5) {
+        } else if (currentY > TRAY_HEIGHT * 0.15 || gesture.vy > 0.3) {
           snapTo = TRAY_HEIGHT * 0.45; 
         } else {
           snapTo = 0; 
@@ -204,17 +201,55 @@ export default function CanvasTab({ allWardrobe }: CanvasTabProps) {
     })
   ).current;
 
+  // 🚀 ÇİFT YAZILMIŞ FONKSİYON SİLİNDİ, TEK VE DOĞRU OLAN BURADA!
   const addItemToCanvas = (selectedWardrobeItem: any) => {
     const randomX = width * 0.2 + Math.random() * 50;
     const randomY = height * 0.1 + Math.random() * 50;
     const newItemId = `canvas_${Date.now()}`;
-    const newItem = { id: newItemId, uri: selectedWardrobeItem.uri, zIndex: maxZIndex + 1, x: randomX, y: randomY };
+    
+    const newItem = { 
+      id: newItemId, 
+      databaseId: selectedWardrobeItem.id, // Kaydederken bize bu gerçek ID lazım
+      uri: selectedWardrobeItem.uri, 
+      zIndex: maxZIndex + 1, 
+      x: randomX, 
+      y: randomY 
+    };
+    
     setMaxZIndex(maxZIndex + 1);
     setCanvasItems([...canvasItems, newItem]);
     setSelectedItemId(newItemId);
     
     if (lastTrayY.current < TRAY_HEIGHT * 0.2) {
       openTray(TRAY_HEIGHT * 0.45);
+    }
+  };
+
+// 🚀 GÜNCELLENMİŞ CANVAS KOMBİN KAYDETME
+  const handleSaveCanvasOutfit = async () => {
+    if (canvasItems.length === 0) {
+      Alert.alert("Uyarı", "Tuvalde kaydedilecek eşya yok!");
+      return;
+    }
+
+    try {
+      const realItemIds = canvasItems
+        .map(item => parseInt(item.databaseId, 10))
+        .filter(id => !isNaN(id) && id > 0);
+
+      // 📦 Java DTO'sunun tam olarak beklediği paket
+      const payload = {
+        name: `My Canvas Creation`, // Java isim bekliyor!
+        clothingItemIds: realItemIds, 
+      };
+
+      // 📍 Java'nın beklediği tam adres: /outfits/{userId}/save
+      await apiClient.post(`/outfits/${CURRENT_USER_ID}/save`, payload);
+      Alert.alert("Başarılı! 🎉", "Harika seçim! Kombinin dolabına (Outfits) eklendi.");
+      
+    } catch (error: any) {
+      console.error("Canvas kombin kaydetme hatası:", error.message);
+      Alert.alert("Hata", "Kombin kaydedilemedi.");
     }
   };
 
@@ -248,7 +283,7 @@ export default function CanvasTab({ allWardrobe }: CanvasTabProps) {
 
       <View style={styles.canvasBottomControls}>
         <TouchableOpacity style={styles.circleBtn} onPress={() => setCanvasItems([])}><MaterialCommunityIcons name="chevron-double-left" size={24} color="#FFF" /></TouchableOpacity>
-        <TouchableOpacity style={styles.neonSaveBtn}><Text style={styles.neonSaveText}>Save</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.neonSaveBtn} onPress={handleSaveCanvasOutfit} activeOpacity={0.8}><Text style={styles.neonSaveText}>Save</Text></TouchableOpacity>
         <TouchableOpacity style={styles.circleBtn}><Feather name="rotate-ccw" size={20} color="#FFF" /></TouchableOpacity>
       </View>
 
