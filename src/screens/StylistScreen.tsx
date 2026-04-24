@@ -6,10 +6,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile } from '../context/ProfileContext';
 import * as Location from 'expo-location';
 
-// 🚀 MİKRO BİLEŞENLERİMİZ (Components)
+// 🚀 MERKEZİ API VE TİPLER EKLENDİ
+import { apiClient } from '../api/client';
+import { ClothingItem } from '../types';
+
 import AISuggestionsTab from '../components/Stylist/AISuggestionsTab';
 import DressMeTab from '../components/Stylist/DressMeTab';
 import CanvasTab from '../components/Stylist/CanvasTab';
+
+const CURRENT_USER_ID = 1; // 🚀 DOĞRU KULLANICI KİMLİĞİ
 
 export default function StylistScreen() {
   const insets = useSafeAreaInsets();
@@ -17,10 +22,10 @@ export default function StylistScreen() {
   const displayName = profileName || "Jane";
   const defaultAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
 
-  const [activeTab, setActiveTab] = useState('AI Suggestions'); 
+  const [activeTab, setActiveTab] = useState('Canvas'); // Test için Canvas'ı varsayılan yaptık
   const [is3DMode, setIs3DMode] = useState(false);
   const [weather, setWeather] = useState({ temp: '--°C', city: 'Konum Bulunuyor...', icon: 'loader' });
-  const [allWardrobe, setAllWardrobe] = useState<any[]>([]);
+  const [allWardrobe, setAllWardrobe] = useState<{id: string, uri: string, category: string}[]>([]);
 
   // ☁️ HAVA DURUMU SİSTEMİ
   useEffect(() => {
@@ -31,13 +36,10 @@ export default function StylistScreen() {
           setWeather({ temp: '--', city: 'İzin Yok', icon: 'slash' });
           return;
         }
-
         let location = await Location.getCurrentPositionAsync({});
         const { latitude, longitude } = location.coords;
-
         const geocode = await Location.reverseGeocodeAsync({ latitude, longitude });
         const cityName = geocode[0]?.city || geocode[0]?.subregion || 'Konum';
-
         const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
         const data = await res.json();
 
@@ -60,22 +62,25 @@ export default function StylistScreen() {
     })();
   }, []);
 
-  // 🧥 VERİTABANINDAN KIYAFET ÇEKME SİSTEMİ
+  // 🧥 VERİTABANINDAN KIYAFET ÇEKME SİSTEMİ (API CLIENT İLE)
   useFocusEffect(
     useCallback(() => {
       const fetchRealWardrobe = async () => {
         try {
-          const response = await fetch('http://172.30.55.25:8080/api/v1/clothes/3');
-          if (response.ok) {
-            const data = await response.json();
-            const formatted = data.map((item: any) => ({ 
-              id: item.id.toString(), 
-              uri: item.imageUrl, 
-              category: item.category 
-            }));
-            setAllWardrobe(formatted.reverse());
-          }
-        } catch (error) { console.error("Dolap çekilirken hata: ", error); }
+          // Kombin yaparken kullanıcının dolabındaki tüm kıyafetleri görebilmesi için size'ı büyük tuttuk
+          const response = await apiClient.get(`/clothes/${CURRENT_USER_ID}?size=200`);
+          const items: ClothingItem[] = response.data.content || response.data;
+          
+          const formatted = items.map(item => ({ 
+            id: item.id.toString(), 
+            uri: item.imageUrl, // URL hatası düzeltildi
+            category: item.category 
+          }));
+          
+          setAllWardrobe(formatted.reverse());
+        } catch (error: any) { 
+          console.error("🚨 Stilist Dolap çekilirken hata: ", error.response?.data || error.message); 
+        }
       };
       fetchRealWardrobe();
     }, [])
@@ -115,9 +120,11 @@ export default function StylistScreen() {
       </View>
 
       {/* 🚀 BİLEŞEN YÖNLENDİRİCİ (ROUTER) MANTIĞI */}
-      {activeTab === 'AI Suggestions' && <AISuggestionsTab allWardrobe={allWardrobe} weather={weather}/>}
-      {activeTab === 'Dress Me' && <DressMeTab allWardrobe={allWardrobe} is3DMode={is3DMode} />}
-      {activeTab === 'Canvas' && <CanvasTab allWardrobe={allWardrobe} />}
+      <View style={{ flex: 1 }}>
+        {activeTab === 'AI Suggestions' && <AISuggestionsTab allWardrobe={allWardrobe} weather={weather}/>}
+        {activeTab === 'Dress Me' && <DressMeTab allWardrobe={allWardrobe} is3DMode={is3DMode} />}
+        {activeTab === 'Canvas' && <CanvasTab allWardrobe={allWardrobe} />}
+      </View>
 
     </View>
   );

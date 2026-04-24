@@ -154,57 +154,68 @@ export default function WardrobeScreen({ navigation }: any) {
 
   const barWidth = loadingProgress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
-  // AI YÜKLEME SÜRECİ
+
+// AI YÜKLEME SÜRECİ (ÇOKLU SEÇİM - BATCH UPLOAD)
   const pickAndUploadImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, quality: 0.8 });
+    // 1. KULLANICIYA 5 FOTOĞRAF SEÇME HAKKI VERİYORUZ
+    let result = await ImagePicker.launchImageLibraryAsync({ 
+      mediaTypes: ['images'], 
+      allowsEditing: false, // Çoklu seçimde kırpma (crop) ekranı açılmaz
+      allowsMultipleSelection: true, // Çoklu Seçim BAŞLADIĞI YER
+      selectionLimit: 5,             // MAKSİMUM 5 FOTOĞRAF
+      quality: 0.8 
+    });
 
-    if (!result.canceled) {
+    if (!result.canceled && result.assets.length > 0) {
       setUploadStatus('uploading'); 
-      const imageUri = result.assets[0].uri;
-      
-      const formData = new FormData();
-      formData.append('image', { uri: imageUri, name: 'wardrobe_item.jpg', type: 'image/jpeg' } as any);
+      let successCount = 0; // Kaç tanesinin başarıyla eklendiğini tutacağız
 
-      try {
-        const extractResponse = await apiClient.post(`/clothes/${CURRENT_USER_ID}/ai-extract`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
+      // 2. SEÇİLEN FOTOĞRAFLARI SIRAYLA (HOŞGÖRÜYLE) SİSTEME BESLE
+      for (let i = 0; i < result.assets.length; i++) {
+        const imageUri = result.assets[i].uri;
+        const formData = new FormData();
+        formData.append('image', { uri: imageUri, name: `wardrobe_item_${i}.jpg`, type: 'image/jpeg' } as any);
 
-        if (extractResponse.status === 202 || extractResponse.status === 200) {
-          const taskId = extractResponse.data.task_id;
-          
-          const checkInterval = setInterval(async () => {
-            try {
+        try {
+          // A. RabbitMQ Kuyruğuna Gönder (Sıraya Sok)
+          const extractResponse = await apiClient.post(`/clothes/${CURRENT_USER_ID}/ai-extract`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+
+          if (extractResponse.status === 202 || extractResponse.status === 200) {
+            const taskId = extractResponse.data.task_id;
+            
+            // B. Bu kıyafetin kuyruktan çıkıp işlenmesini bekle (Polling)
+            let isDone = false;
+            while (!isDone) {
+              await new Promise(resolve => setTimeout(resolve, 3000)); // 3 saniye bekle
+              
               const statusResponse = await apiClient.get(`/clothes/${CURRENT_USER_ID}/ai-status/${taskId}`);
               const statusData = statusResponse.data;
 
               if (statusData.status === 'COMPLETED') {
-                clearInterval(checkInterval); 
-                
-                await fetchWardrobe(0, true); // Yeni kıyafet eklenince listeyi en baştan yenile
-                
-                setUploadStatus('completed');
-                setTimeout(() => { setUploadStatus('idle'); }, 1500);
-                
+                successCount++;
+                isDone = true; // İşlem bitti, döngüden çık ve sıradaki fotoğrafa geç
               } else if (statusData.status === 'FAILURE') {
-                clearInterval(checkInterval); 
-                setUploadStatus('idle');
-                Alert.alert("Hata", "Yapay zeka kıyafeti işleyemedi.");
+                isDone = true; // Hatalıysa da takılıp kalma, sıradaki fotoğrafa geç
               }
-            } catch (err) {
-               clearInterval(checkInterval); 
-               setUploadStatus('idle');
             }
-          }, 3000); 
-        } else {
-          Alert.alert('Hata', 'Sisteme ulaşılamadı.'); 
-          setUploadStatus('idle');
+          }
+        } catch (error) { 
+          console.error(`${i + 1}. fotoğraf yüklenirken hata oluştu:`, error);
         }
-      } catch (error) { 
-        console.error("Yükleme Hatası:", error);
-        Alert.alert('Hata', 'Sunucuya bağlanılamadı.');
-        setUploadStatus('idle'); 
+      } // For döngüsü (Tüm fotoğraflar) bitti!
+
+      // 3. FİNAL: EĞER EN AZ 1 TANE BİLE YÜKLENDİYSE DOLABI YENİLE
+      if (successCount > 0) {
+        await fetchWardrobe(0, true); 
+        setUploadStatus('completed');
+      } else {
+        Alert.alert('Hata', 'Hiçbir fotoğraf işlenemedi.');
+        setUploadStatus('idle');
       }
+      
+      setTimeout(() => { setUploadStatus('idle'); }, 2000);
     }
   };
 
