@@ -5,7 +5,6 @@ import PremiumToast from '../PremiumToast';
 import { apiClient } from '../../api/client';
 import { ClothingItem } from '../../types';
 
-const [toastVisible, setToastVisible] = useState(false);
 const { width, height } = Dimensions.get('window');
 const CURRENT_USER_ID = 1;
 
