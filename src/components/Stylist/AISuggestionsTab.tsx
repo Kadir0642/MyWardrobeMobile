@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Image, Modal, ScrollView, Dimensions, ActivityIndicator, Animated, PanResponder, Alert } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-
+import PremiumToast from '../PremiumToast';
 import { apiClient } from '../../api/client';
 import { ClothingItem } from '../../types';
 
+const [toastVisible, setToastVisible] = useState(false);
 const { width, height } = Dimensions.get('window');
 const CURRENT_USER_ID = 1;
 
@@ -37,7 +38,8 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
   const [currentOutfit, setCurrentOutfit] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [activeBlueprintIndex, setActiveBlueprintIndex] = useState<0 | 1 | 2>(0);
-
+  // BİLDİRİM BURAYA GELDİ
+  const [toastVisible, setToastVisible] = useState(false);
   const [isFeedbackVisible, setFeedbackVisible] = useState(false);
   const [feedbackStep, setFeedbackStep] = useState<'REASON' | 'SELECT_ITEMS'>('REASON');
   const [selectedReasonCode, setSelectedReasonCode] = useState<string>('NONE');
@@ -45,7 +47,7 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
 
   const sheetPanY = useRef(new Animated.Value(height)).current;
   
-  // 🚀 UX DETAYI: LIKE Butonu Kalp Atış Animasyonu
+  // UX DETAYI: LIKE Butonu Kalp Atış Animasyonu
   const likeScale = useRef(new Animated.Value(1)).current;
 
   const openFeedbackModal = () => {
@@ -207,20 +209,22 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
     fetchOutfitFromAPI(activeBlueprintIndex); 
   };
 
-  // 🚀 LIKE BUTONU ARTIK HEM KAYDEDİYOR HEM ANİMASYON YAPIYOR
+// 🚀 GÜNCELLENMİŞ LIKE BUTONU (Premium Bildirimli)
   const handleLike = () => {
     // 1. Kullanıcıya "Basıldı" hissi vermek için kalbi şişir
     Animated.sequence([
       Animated.timing(likeScale, { toValue: 1.4, duration: 150, useNativeDriver: true }),
       Animated.timing(likeScale, { toValue: 1, duration: 150, useNativeDriver: true })
     ]).start(() => {
-      // 2. Animasyon bitince asıl işlemleri yap
+      // 2. Animasyon bitince verileri Java'ya gönder
       sendFeedbackToAPI('LIKE', 'NONE', []); 
-      saveOutfitToDatabase(currentOutfit); // OUTFITS sekmesi için kaydet
+      saveOutfitToDatabase(currentOutfit); 
       
-      Alert.alert("Harika Seçim! 💖", "Kombin dolabına kaydedildi.", [
-        { text: "Sıradaki", onPress: () => fetchOutfitFromAPI(activeBlueprintIndex) }
-      ]);
+      // 3. Eski çirkin Alert YERİNE, Premium Bildirim şalterini aç!
+      setToastVisible(true);
+      
+      // 4. Kullanıcıyı hiç bekletmeden otomatik olarak yeni kombini çek!
+      fetchOutfitFromAPI(activeBlueprintIndex);
     });
   };
 
@@ -366,6 +370,12 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
           </Animated.View>
         </View>
       </Modal>
+
+      <PremiumToast // Bildirim Toast bildirimi
+        visible={toastVisible} 
+        message="Kombin Dolabına Eklendi 💖" 
+        onHide={() => setToastVisible(false)} 
+      />
     </View>
   );
 }

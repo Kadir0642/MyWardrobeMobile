@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Dimensions, Animated, PanResponder, Image, Alert, TouchableWithoutFeedback, ScrollView } from 'react-native';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-
+import PremiumToast from '../PremiumToast';
 // 🚀 API BAĞLANTISI EKLENDİ (Bunu unutmuştuk!)
 import { apiClient } from '../../api/client';
 
@@ -151,6 +151,8 @@ export default function CanvasTab({ allWardrobe }: CanvasTabProps) {
   const [maxZIndex, setMaxZIndex] = useState(1);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [isTrayOpen, setIsTrayOpen] = useState(false);
+  // BİLDİRİM BURAYA GELDİ
+  const [toastVisible, setToastVisible] = useState(false);
 
   const TRAY_HEIGHT = height * 0.85; 
   const trayTranslateY = useRef(new Animated.Value(TRAY_HEIGHT)).current; 
@@ -245,7 +247,7 @@ export default function CanvasTab({ allWardrobe }: CanvasTabProps) {
 
       // 📍 Java'nın beklediği tam adres: /outfits/{userId}/save
       await apiClient.post(`/outfits/${CURRENT_USER_ID}/save`, payload);
-      Alert.alert("Başarılı! 🎉", "Harika seçim! Kombinin dolabına (Outfits) eklendi.");
+      setToastVisible(true); // Başarılı olunca şalteri aç ve Premium bildirimi göster!
       
     } catch (error: any) {
       console.error("Canvas kombin kaydetme hatası:", error.message);
@@ -319,6 +321,12 @@ export default function CanvasTab({ allWardrobe }: CanvasTabProps) {
         <Feather name={isTrayOpen ? "chevron-down" : "chevron-up"} size={24} color="#FFF" />
         <Text style={styles.addItemsBarText}>{isTrayOpen ? "Close" : "Add Items"}</Text>
       </TouchableOpacity>
+
+      <PremiumToast 
+        visible={toastVisible} 
+        message="Kombin Dolabına Eklendi 🦋" 
+        onHide={() => setToastVisible(false)} // 3 saniye sonra otomatik kapanınca şalteri kapatır
+      />
     </View>
   );
 }

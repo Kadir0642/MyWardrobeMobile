@@ -4,11 +4,15 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 
+// Uygulamanın NAVİGATOR kısmı 
+// Sayfalar arası bağlantılar burada yapılıyor
+
 // Kapsül ve Sayfa Importları
 import { ProfileProvider } from './src/context/ProfileContext';
 import TabNavigator from './src/navigation/TabNavigator';
 import ItemDetailScreen from './src/screens/ItemDetailScreen';
 import PlannerScreen from './src/screens/PlannerScreen';
+import OutfitDetailScreen from './src/screens/OutfitDetailScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -29,7 +33,7 @@ export default function App() {
               options={{ presentation: 'card' }} 
             />
 
-            {/* 🚀 3. KAT: Tarih hapına tıklayınca açılacak olan Planlayıcı! */}
+            {/* 3. KAT: Tarih hapına tıklayınca açılacak olan Planlayıcı! */}
             <Stack.Screen 
               name="Planner" 
               component={PlannerScreen} 
@@ -40,6 +44,13 @@ export default function App() {
                 headerTintColor: '#1A1A1A',
                 headerStyle: { backgroundColor: '#FAF9F4' },
               }} 
+            />
+            
+            {/* 4. KAT: Kombinlerin detay sayfası */}
+            <Stack.Screen 
+              name="OutfitDetail" 
+              component={OutfitDetailScreen} 
+              options={{ presentation: 'card', headerShown: false }} 
             />
           </Stack.Navigator>
           

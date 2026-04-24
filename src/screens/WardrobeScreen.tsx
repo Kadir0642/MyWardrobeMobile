@@ -279,12 +279,12 @@ export default function WardrobeScreen({ navigation }: any) {
 
 // 🦋 2. OUTFIT (KOMBİN) KARTI TASARIMI (4 Parçalı Grid)
   const renderOutfit = ({ item }: { item: any }) => {
-    // 🚀 DÜZELTME: Java DTO'sundan gelen liste adı "clothes", "items" değil!
+    // DÜZELTME: Java DTO'sundan gelen liste adı "clothes", "items" değil!
     const clothesArray = item.clothes || [];
     const itemsToShow = clothesArray.slice(0, 4);
 
     return (
-      <TouchableOpacity activeOpacity={0.9} style={styles.outfitCard}>
+      <TouchableOpacity activeOpacity={0.9} style={styles.outfitCard}onPress={()=> navigation.navigate('OutfitDetail',{ outfit: item})}>
         <View style={styles.outfitImageGrid}>
           {itemsToShow.map((outfitItem: any, index: number) => (
             <View key={index} style={styles.outfitGridCell}>
