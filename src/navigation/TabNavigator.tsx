@@ -84,7 +84,7 @@ export default function TabNavigator() {
         animationEnabled: true,
       }}
     >
-      <Tab.Screen name="Network" component={SocialScreen} options={{ tabBarLabel: 'Ağ' }} />
+      <Tab.Screen name="Network" component={SocialScreen} options={{ tabBarLabel: 'Network' }} />
       <Tab.Screen name="Planner" component={PlannerScreen} options={{ tabBarLabel: 'Planner' }} />
       <Tab.Screen name="Style" component={StylistScreen} options={{ tabBarLabel: 'Style' }} />
       <Tab.Screen name="Wardrobe" component={WardrobeScreen} options={{ tabBarLabel: 'Wardrobe' }} />

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Image } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native'; // 🚀 useNavigation eklendi
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile } from '../context/ProfileContext';
 import * as Location from 'expo-location';
@@ -17,16 +17,15 @@ const CURRENT_USER_ID = 1;
 
 export default function StylistScreen() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>(); // 🚀 Yönlendirme motoru başlatıldı
   const { profileImage } = useProfile();
   const defaultAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
 
   const [activeTab, setActiveTab] = useState('Canvas'); 
   const [is3DMode, setIs3DMode] = useState(false); 
-  
-  // 🚀 SABİT TARİH (Sadece bugünü gösterir)
+ // 🚀 SABİT TARİH (Sadece bugünü gösterir) 
   const currentDate = new Date();
-
-  // ☁️ PREMIUM HAVA DURUMU STATE'İ
+// ☁️ PREMIUM HAVA DURUMU STATE'İ
   const [weather, setWeather] = useState({ 
     temp: '--°', 
     city: 'Konum', 
@@ -96,8 +95,8 @@ export default function StylistScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      
-      {/* HEADER ALANI */}
+
+{/* HEADER ALANI */}      
       <View style={styles.header}>
         
         {/* SOL: Profil Fotoğrafı */}
@@ -107,11 +106,16 @@ export default function StylistScreen() {
         
         {/* ORTA: Sabit, Minimalist Tarih Hapı */}
         <View style={styles.headerCenter}>
-          <View style={styles.dateSelector}>
+          {/* 🚀 TARİH HAPI ARTIK TIKLANABİLİR VE PLANNER'A GİDİYOR */}
+          <TouchableOpacity 
+            style={styles.dateSelector} 
+            activeOpacity={0.7} 
+            onPress={() => navigation.navigate('Planner')} // Yönlendirme (Route adının Navigator'da 'Planner' olduğundan emin ol)
+          >
             <Text style={styles.dateText}>
               {currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* SAĞ: Şık Hava Durumu */}
@@ -122,7 +126,7 @@ export default function StylistScreen() {
 
       </View>
 
-      {/* SEKMELER MENÜSÜ */}
+ {/* SEKMELER MENÜSÜ */}
       <View style={styles.tabsContainer}>
         {['Dress Me', 'Canvas', 'AI Suggestions'].map((tab) => (
           <TouchableOpacity key={tab} style={[styles.tabButton, activeTab === tab && styles.tabButtonActive]} onPress={() => setActiveTab(tab)}>
@@ -131,7 +135,7 @@ export default function StylistScreen() {
         ))}
       </View>
 
-      {/* BİLEŞEN YÖNLENDİRİCİ */}
+{/* BİLEŞEN YÖNLENDİRİCİ */}
       <View style={{ flex: 1 }}>
         {activeTab === 'AI Suggestions' && <AISuggestionsTab allWardrobe={allWardrobe} weather={weather}/>}
         {activeTab === 'Dress Me' && <DressMeTab allWardrobe={allWardrobe} is3DMode={is3DMode} />}
@@ -175,15 +179,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5', 
     borderRadius: 20, 
     paddingHorizontal: 32, 
-    paddingVertical: 6,
+    paddingVertical: 7,
     borderWidth: 1,
     borderColor: '#EBE8DF'
   },
   dateText: { 
-    fontSize: 13, // Boyutu küçültüldü
+    fontSize: 13, 
     fontWeight: '700', 
     color: '#1A1A1A', 
-    letterSpacing: 0.9 
+    letterSpacing: 1.0 
   },
   
   weatherContainer: { 
@@ -205,7 +209,8 @@ const styles = StyleSheet.create({
     color: '#D1CFC7' 
   },
 
-  tabsContainer: { flexDirection: 'row', paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#EBE8DF', marginBottom: 5 }, //üst tab bar altı çizgi
+   //üst tab bar altı çizgi
+  tabsContainer: { flexDirection: 'row', paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#EBE8DF', marginBottom: 5 },
   tabButton: { flex: 1, paddingVertical: 12, alignItems: 'center' },
   tabButtonActive: { borderBottomWidth: 2, borderBottomColor: '#1A1A1A' },
   tabText: { fontSize: 14, fontWeight: '600', color: '#A0A0A0' },
