@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-// 🚀 ActivityIndicator eklendi (Aşağı kaydırırken dönen yükleme ikonu için)
 import { View, Text, StyleSheet, Image, TouchableOpacity, Animated, Easing, Dimensions, FlatList, ScrollView, Alert, RefreshControl, ActivityIndicator } from 'react-native';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,16 +7,14 @@ import { useProfile } from '../context/ProfileContext';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
 
-// Merkezi API ve Tip Güvenliği İçe Aktarıldı
 import { apiClient } from '../api/client';
 import { ClothingItem } from '../types';
 
 const { width } = Dimensions.get('window');
 
-// Şimdilik test amaçlı User ID'mizi sabit tutalım, İleride Auth (Giriş) sistemine bağlanacak
+// r ile tüm uygulamayı baştan aşağı günceller
 const CURRENT_USER_ID = 1; 
 
-// 🚀 Kategori ID'leri artık doğrudan Python AI'ın yolladığı (UPPERCASE) etiketlerle uyumlu
 const CATEGORIES = [
   { id: 'ALL', label: 'All', icon: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=100' },
   { id: 'OUTERWEAR', label: 'Outerwear', icon: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=100' },
@@ -57,34 +54,33 @@ export default function WardrobeScreen({ navigation }: any) {
   const [masterItems, setMasterItems] = useState<ClothingItem[]>([]); 
   const [displayItems, setDisplayItems] = useState<ClothingItem[]>([]); 
   
-  // 🚀 SAYFALAMA (PAGINATION) İÇİN YENİ STATELER
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const [totalItemsCount, setTotalItemsCount] = useState(0); // Toplam kıyafet sayısı
-  const [isLoadingMore, setIsLoadingMore] = useState(false); // Yeni sayfa yükleniyor mu?
+  const [totalItemsCount, setTotalItemsCount] = useState(0); 
+  const [isLoadingMore, setIsLoadingMore] = useState(false); 
   
+  // 🚀 NEON SARI KASAMIZ GERİ DÖNDÜ!
   const [newItemIds, setNewItemIds] = useState<number[]>([]);
+  
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'completed'>('idle');
   const [numColumns, setNumColumns] = useState(2); 
   const [refreshing, setRefreshing] = useState(false);
 
   const loadingProgress = useRef(new Animated.Value(0)).current;
 
-// 1. JAVA'DAN DOLABI ÇEK (KURŞUN GEÇİRMEZ VERSİYON)
+  // 1. JAVA'DAN DOLABI ÇEK (NEON IŞIKLARI YAKMA DESTEKLİ)
   const fetchWardrobe = async (page = 0, isRefresh = false) => {
     if (isLoadingMore) return; 
 
     try {
       if (page > 0) setIsLoadingMore(true);
 
-      const response = await apiClient.get(`/clothes/${CURRENT_USER_ID}?page=${page}&size=20`);
+      // 🚀 DİKKAT: &sort=id,desc eklendi! En yeni kıyafetler hep en üstte (sayfa 0'da) gelecek!
+      const response = await apiClient.get(`/clothes/${CURRENT_USER_ID}?page=${page}&size=20&sort=id,desc`);
       
-      // 🚀 ÇÖZÜM BURASI: Gelen kargonun (response.data) içindeki "content" kutusunu al!
-      // Eğer content yoksa (belki normal liste dönmüştür), direkt kendini al.
       const responseData = response.data;
       const itemsArray: ClothingItem[] = responseData.content ? responseData.content : (Array.isArray(responseData) ? responseData : []);
 
-      // Toplam sayıları da yine kargonun üstünden (responseData) okuyoruz
       const totalElements = responseData.totalElements || itemsArray.length;
       const totalPagesFromApi = responseData.totalPages || 1;
 
@@ -98,6 +94,9 @@ export default function WardrobeScreen({ navigation }: any) {
       }
       
       setCurrentPage(page);
+      
+      // 🚀 Yeni eklenenleri bulmak için listeyi dışarı gönderiyoruz
+      return itemsArray; 
 
     } catch (error: any) {
       console.error("🚨 Dolap verisi çekme hatası: ", error.response?.data || error.message);
@@ -118,14 +117,12 @@ export default function WardrobeScreen({ navigation }: any) {
     setRefreshing(false);
   }, []);
 
-  // 🚀 KULLANICI AŞAĞI KAYDIRDIKÇA YENİ SAYFAYI ÇAĞIRAN FONKSİYON
   const loadMoreItems = () => {
     if (currentPage < totalPages - 1 && !isLoadingMore) {
       fetchWardrobe(currentPage + 1, false);
     }
   };
 
-  // 2. IN-MEMORY FİLTRELEME MOTORU
   useEffect(() => {
     if (activeCategory === 'ALL') {
       setDisplayItems(masterItems);
@@ -138,7 +135,6 @@ export default function WardrobeScreen({ navigation }: any) {
   }, [activeCategory, masterItems]);
 
 
-  // Animasyon useEffect'i
   useEffect(() => {
     if (uploadStatus === 'uploading') {
       Animated.loop(Animated.sequence([
@@ -154,30 +150,29 @@ export default function WardrobeScreen({ navigation }: any) {
 
   const barWidth = loadingProgress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
-
-// AI YÜKLEME SÜRECİ (ÇOKLU SEÇİM - BATCH UPLOAD)
+  // 🚀 AI YÜKLEME SÜRECİ VE NEON ZIRH GİYDİRME
   const pickAndUploadImage = async () => {
-    // 1. KULLANICIYA 5 FOTOĞRAF SEÇME HAKKI VERİYORUZ
     let result = await ImagePicker.launchImageLibraryAsync({ 
       mediaTypes: ['images'], 
-      allowsEditing: false, // Çoklu seçimde kırpma (crop) ekranı açılmaz
-      allowsMultipleSelection: true, // Çoklu Seçim BAŞLADIĞI YER
-      selectionLimit: 5,             // MAKSİMUM 5 FOTOĞRAF
+      allowsEditing: false, 
+      allowsMultipleSelection: true, 
+      selectionLimit: 5,             
       quality: 0.8 
     });
 
     if (!result.canceled && result.assets.length > 0) {
       setUploadStatus('uploading'); 
-      let successCount = 0; // Kaç tanesinin başarıyla eklendiğini tutacağız
+      let successCount = 0; 
+      
+      // 🚀 Yükleme başlamadan önceki dolap hafızası (Dedektiflik için)
+      const existingIdsBeforeUpload = new Set(masterItems.map(i => i.id));
 
-      // 2. SEÇİLEN FOTOĞRAFLARI SIRAYLA (HOŞGÖRÜYLE) SİSTEME BESLE
       for (let i = 0; i < result.assets.length; i++) {
         const imageUri = result.assets[i].uri;
         const formData = new FormData();
         formData.append('image', { uri: imageUri, name: `wardrobe_item_${i}.jpg`, type: 'image/jpeg' } as any);
 
         try {
-          // A. RabbitMQ Kuyruğuna Gönder (Sıraya Sok)
           const extractResponse = await apiClient.post(`/clothes/${CURRENT_USER_ID}/ai-extract`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
           });
@@ -185,30 +180,41 @@ export default function WardrobeScreen({ navigation }: any) {
           if (extractResponse.status === 202 || extractResponse.status === 200) {
             const taskId = extractResponse.data.task_id;
             
-            // B. Bu kıyafetin kuyruktan çıkıp işlenmesini bekle (Polling)
             let isDone = false;
             while (!isDone) {
-              await new Promise(resolve => setTimeout(resolve, 3000)); // 3 saniye bekle
+              await new Promise(resolve => setTimeout(resolve, 3000));
               
               const statusResponse = await apiClient.get(`/clothes/${CURRENT_USER_ID}/ai-status/${taskId}`);
               const statusData = statusResponse.data;
 
               if (statusData.status === 'COMPLETED') {
                 successCount++;
-                isDone = true; // İşlem bitti, döngüden çık ve sıradaki fotoğrafa geç
+                isDone = true; 
               } else if (statusData.status === 'FAILURE') {
-                isDone = true; // Hatalıysa da takılıp kalma, sıradaki fotoğrafa geç
+                isDone = true; 
               }
             }
           }
         } catch (error) { 
           console.error(`${i + 1}. fotoğraf yüklenirken hata oluştu:`, error);
         }
-      } // For döngüsü (Tüm fotoğraflar) bitti!
+      }
 
-      // 3. FİNAL: EĞER EN AZ 1 TANE BİLE YÜKLENDİYSE DOLABI YENİLE
       if (successCount > 0) {
-        await fetchWardrobe(0, true); 
+        // 🚀 İşlem bitti, dolabı en baştan taze taze çek!
+        const freshItems = await fetchWardrobe(0, true); 
+        
+        if (freshItems) {
+          // 🚀 Eski dolapta OLMAYAN yeni eklenmiş kıyafetlerin ID'lerini bul (Zırh giydir)
+          const newlyAddedIds = freshItems
+            .filter((item: ClothingItem) => !existingIdsBeforeUpload.has(item.id))
+            .map((item: ClothingItem) => item.id);
+            
+          if (newlyAddedIds.length > 0) {
+            setNewItemIds(prev => [...prev, ...newlyAddedIds]); 
+          }
+        }
+        
         setUploadStatus('completed');
       } else {
         Alert.alert('Hata', 'Hiçbir fotoğraf işlenemedi.');
@@ -223,6 +229,7 @@ export default function WardrobeScreen({ navigation }: any) {
   const cardWidth = (width - 2) / numColumns; 
 
   const handleItemPress = (clickedItem: ClothingItem) => {
+    // 🚀 Neon yazıyı ve çerçeveyi söndürme mantığı
     if (newItemIds.includes(clickedItem.id)) {
       setNewItemIds(prev => prev.filter(id => id !== clickedItem.id));
     }
@@ -230,16 +237,18 @@ export default function WardrobeScreen({ navigation }: any) {
   };
 
   const renderItem = ({ item }: { item: ClothingItem }) => {
-    const isNewItem = newItemIds.includes(item.id);
+    const isNewItem = newItemIds.includes(item.id); // Neon zırhını kontrol et
 
     return (
       <TouchableOpacity 
         activeOpacity={0.9} 
         onPress={() => handleItemPress(item)}
+        // 🚀 Eğer isNewItem "True" ise sarı sınır çizgisini (newCardBorder) aktif et
         style={[styles.cardContainer, { width: cardWidth }, isNewItem && styles.newCardBorder]}
       >
         <View style={styles.cardImageWrapper}>
           <Image source={{ uri: item.imageUrl }} style={styles.cardImage} />
+          {/* 🚀 Eğer isNewItem "True" ise sol üste neon "NEW" kutucuğunu bas */}
           {isNewItem && (
             <View style={styles.newBadge}>
               <Text style={styles.newBadgeText}>NEW</Text>
@@ -251,7 +260,7 @@ export default function WardrobeScreen({ navigation }: any) {
           </View>
         </View>
         <View style={styles.cardFooter}>
-          <Text style={styles.brandText} numberOfLines={1}>{item.brand || 'AI Item'}</Text>
+          <Text style={styles.brandText} numberOfLines={1}>{item.brand || 'AI Item'}</Text> // Wardrobe ekranında kıyafetlerin markaları göstermek için " item.brand " yazılmalı
         </View>
       </TouchableOpacity>
     );
@@ -290,7 +299,6 @@ export default function WardrobeScreen({ navigation }: any) {
       <View style={styles.tabsRow}>
         <TouchableOpacity style={styles.tabItem}>
           <Text style={styles.tabTitle}>ITEMS</Text>
-          {/* 🚀 ARTIK LİSTEDEKİ SAYIYI DEĞİL, GERÇEK TOPLAM SAYIYI GÖSTERİYOR */}
           <Text style={styles.tabCount}>({totalItemsCount})</Text> 
         </TouchableOpacity>
         <TouchableOpacity style={[styles.tabItem, styles.tabCenterBorder]}>
@@ -334,10 +342,9 @@ export default function WardrobeScreen({ navigation }: any) {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#E07A5F" />}
         
-        // 🚀 SONSUNZ KAYDIRMA TETİKLEYİCİLERİ
-        onEndReached={loadMoreItems} // Listenin sonuna gelince bu fonksiyonu çalıştır
-        onEndReachedThreshold={0.5}  // Listenin sonuna %50 yaklaşınca yüklemeye başla (kullanıcı beklemesin)
-        ListFooterComponent={        // Yeni sayfa yükleniyorsa listenin en altında bir dönen tekerlek göster
+        onEndReached={loadMoreItems} 
+        onEndReachedThreshold={0.5}  
+        ListFooterComponent={        
           isLoadingMore ? (
             <View style={{ paddingVertical: 20 }}>
               <ActivityIndicator size="small" color="#E07A5F" />
@@ -365,7 +372,6 @@ export default function WardrobeScreen({ navigation }: any) {
   );
 }
 
-// Stiller aynı
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F2EB' },
   loadingBanner: { backgroundColor: '#EBE8DF', paddingVertical: 8, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 1, borderColor: '#D1CFC7' },
@@ -397,11 +403,14 @@ const styles = StyleSheet.create({
   filterIconsBox: { flexDirection: 'row', paddingHorizontal: 15, height: '100%', alignItems: 'center', borderLeftWidth: 1, borderColor: '#D1CFC7', backgroundColor: '#F5F2EB' },
   gridContainer: { paddingBottom: 100 }, 
   cardContainer: { margin: 1, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderRightWidth: 1, borderColor: '#D1CFC7' },
+  
+  // 🚀 İŞTE SENİN NEON SARI STİLLERİN BURADA!
   newCardBorder: { borderColor: '#DFFF00', borderWidth: 2 },
-  cardImageWrapper: { width: '100%', aspectRatio: 3/4, backgroundColor: '#F9F9F9' },
-  cardImage: { width: '100%', height: '100%', resizeMode: 'contain' },
   newBadge: { position: 'absolute', top: 8, left: 8, backgroundColor: '#DFFF00', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4, zIndex: 10 },
   newBadgeText: { fontSize: 9, fontWeight: '900', color: '#1A1A1A', letterSpacing: 0.5 },
+  
+  cardImageWrapper: { width: '100%', aspectRatio: 3/4, backgroundColor: '#F9F9F9' },
+  cardImage: { width: '100%', height: '100%', resizeMode: 'contain' },
   likeContainer: { position: 'absolute', top: 10, right: 10, alignItems: 'center' },
   likeText: { fontSize: 12, fontWeight: '700', color: '#1A1A1A', marginTop: 2 },
   cardFooter: { padding: 8, borderTopWidth: 1, borderColor: '#F0F0F0' },
