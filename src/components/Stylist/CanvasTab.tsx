@@ -324,7 +324,7 @@ export default function CanvasTab({ allWardrobe }: CanvasTabProps) {
 
       <PremiumToast 
         visible={toastVisible} 
-        message="Kombin Dolabına Eklendi 🦋" 
+        message="Outfit saved 🦋" 
         onHide={() => setToastVisible(false)} // 3 saniye sonra otomatik kapanınca şalteri kapatır
       />
     </View>

@@ -372,7 +372,7 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
 
       <PremiumToast // Bildirim Toast bildirimi
         visible={toastVisible} 
-        message="Kombin Dolabına Eklendi 💖" 
+        message="Outfit saved 🦋" 
         onHide={() => setToastVisible(false)} 
       />
     </View>
