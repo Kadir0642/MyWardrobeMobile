@@ -15,9 +15,7 @@ const { width } = Dimensions.get('window');
 const MOCK_PRODUCTS = [
   { id: '1', title: 'Vintage Deri Ceket', price: '₺1.250', brand: 'Harley Davidson', size: 'L', sellerName: 'alex_style', sellerAvatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100', image: 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=400', isLiked: false },
   { id: '2', title: 'Y2K Bol Paraşüt Pantolon', price: '₺450', brand: 'Jaded London', size: 'M', sellerName: 'mia_vintage', sellerAvatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=100', image: 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400', isLiked: true },
-  { id: '3', title: 'Jordan 1 Retro High', price: '₺3.800', brand: 'Nike', size: '42', sellerName: 'sneaker_head', sellerAvatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100', image: 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=400', isLiked: false },
   { id: '4', title: 'Oversize Basic Tişört', price: '₺150', brand: 'Zara', size: 'XL', sellerName: 'kadir_dev', sellerAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100', image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400', isLiked: false },
-  { id: '5', title: 'Keten Yazlık Gömlek', price: '₺300', brand: 'Mango', size: 'S', sellerName: 'summer_vibes', sellerAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100', image: 'https://images.unsplash.com/photo-1596755094514-f87e32f85e23?w=400', isLiked: true },
   { id: '6', title: 'Retro Güneş Gözlüğü', price: '₺220', brand: 'No Name', size: 'Standart', sellerName: 'retro_gal', sellerAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100', image: 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=400', isLiked: false },
 ];
 

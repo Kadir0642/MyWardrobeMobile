@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, ScrollView, TextInput, Alert } from 'react-native';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, ScrollView, TextInput } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { apiClient } from '../api/client';
-import { CURRENT_USER_ID } from './WardrobeScreen'; // İstersen context'ten de alabilirsin
+import PremiumToast from '../components/PremiumToast';
+import PremiumAlert from '../components/PremiumAlert'; // 🚀 Yeni zarif popup'ımız geldi
 
 const { width } = Dimensions.get('window');
 
@@ -12,62 +13,61 @@ export default function OutfitDetailScreen({ route, navigation }: any) {
   const insets = useSafeAreaInsets();
   const { outfit } = route.params;
 
-  // Başlangıçta Java'dan gelen verileri State'e alıyoruz
   const [outfitName, setOutfitName] = useState(outfit.name || 'Kombinim');
   const [isEditing, setIsEditing] = useState(false);
   const [clothes] = useState(outfit.clothes || []);
 
-  // 🚀 İSİM GÜNCELLEME (Backend'e PUT isteği atılacak)
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  
+  // 🚀 ÖZEL UYARI PENCERESİ ŞALTERİ
+  const [isDeleteAlertVisible, setIsDeleteAlertVisible] = useState(false);
+
+  // İSİM GÜNCELLEME
   const handleSaveName = async () => {
     setIsEditing(false);
     try {
-      // Not: Backend tarafında PUT /outfits/{id} gibi bir metod yazmış olmamız lazım
-      // await apiClient.put(`/outfits/${outfit.id}`, { name: outfitName });
-      console.log(`Kombin ismi güncellendi: ${outfitName}`);
+      await apiClient.put(`/outfits/${outfit.id}`, { name: outfitName });
+      setToastMessage("Kombin ismi güncellendi ✨");
+      setToastVisible(true);
     } catch (error) {
       console.error("İsim güncellenemedi", error);
-      Alert.alert("Hata", "İsim güncellenirken bir sorun oluştu.");
+      // Hata durumunda da premium alert kullanabilirsin ama şimdilik konsola yazdırıyoruz
     }
   };
 
-  // 🚀 KOMBİNİ SİLME (Backend'e DELETE isteği atılacak)
-  const handleDeleteOutfit = () => {
-    Alert.alert(
-      "Kombini Sil",
-      "Bu kombini dolabından silmek istediğine emin misin?",
-      [
-        { text: "İptal", style: "cancel" },
-        { 
-          text: "Sil", 
-          style: "destructive",
-          onPress: async () => {
-            try {
-              // await apiClient.delete(`/outfits/${outfit.id}`);
-              console.log("Kombin silindi!");
-              navigation.goBack(); // Silince Wardrobe'a geri dön
-            } catch (error) {
-              console.error("Kombin silinemedi", error);
-            }
-          }
-        }
-      ]
-    );
+  // 🚀 KOMBİNİ SİLME (Artık doğrudan Alert.alert çağırmıyor, bizim şalteri açıyor)
+  const confirmDelete = async () => {
+    setIsDeleteAlertVisible(false); // Popup'ı kapat
+    try {
+      await apiClient.delete(`/outfits/${outfit.id}`);
+      
+      setToastMessage("Kombin dolabından çıkarıldı 🦋");
+      setToastVisible(true);
+      
+      setTimeout(() => {
+        navigation.goBack(); 
+      }, 1500);
+
+    } catch (error) {
+      console.error("Kombin silinemedi", error);
+    }
   };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       
-      {/* ÜST BAR (HEADER) */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
           <Feather name="chevron-left" size={28} color="#1A1A1A" />
         </TouchableOpacity>
-        <TouchableOpacity onPress={handleDeleteOutfit} style={styles.iconBtn}>
-          <Feather name="trash-2" size={22} color="#FF3B30" />
+        
+        {/* 🚀 Sert kırmızı yerine zarif bir soft gri/siyah ikon */}
+        <TouchableOpacity onPress={() => setIsDeleteAlertVisible(true)} style={styles.iconBtn}>
+          <Feather name="trash-2" size={22} color="#555" /> 
         </TouchableOpacity>
       </View>
 
-      {/* KOMBİN İSMİ VE DÜZENLEME ALANI */}
       <View style={styles.titleSection}>
         {isEditing ? (
           <View style={styles.editRow}>
@@ -95,7 +95,6 @@ export default function OutfitDetailScreen({ route, navigation }: any) {
         </Text>
       </View>
 
-      {/* İÇİNDEKİ PARÇALARIN LİSTESİ */}
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <Text style={styles.sectionTitle}>Kombin Parçaları ({clothes.length})</Text>
         
@@ -105,7 +104,7 @@ export default function OutfitDetailScreen({ route, navigation }: any) {
               key={item.id} 
               style={styles.itemCard}
               activeOpacity={0.9}
-              onPress={() => navigation.navigate('ItemDetail', { item })} // Parçanın da kendi detayına gidebilir
+              onPress={() => navigation.navigate('ItemDetail', { item })}
             >
               <View style={styles.imageBox}>
                 <Image source={{ uri: item.imageUrl }} style={styles.itemImage} />
@@ -115,6 +114,24 @@ export default function OutfitDetailScreen({ route, navigation }: any) {
           ))}
         </View>
       </ScrollView>
+
+      {/* 🚀 YENİ ZARİF ONAY PENCEREMİZ */}
+      <PremiumAlert 
+        visible={isDeleteAlertVisible}
+        title="Kombini Sil"
+        message="Bu kombini dolabından kaldırmak istediğine emin misin? Parçalar dolabında kalmaya devam edecek."
+        iconName="trash"
+        confirmText="Kaldır"
+        onCancel={() => setIsDeleteAlertVisible(false)}
+        onConfirm={confirmDelete}
+      />
+
+      {/* PREMIUM TOAST BİLDİRİMİ */}
+      <PremiumToast 
+        visible={toastVisible} 
+        message={toastMessage} 
+        onHide={() => setToastVisible(false)} 
+      />
 
     </View>
   );

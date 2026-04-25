@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 const MOCK_POSTS = [
   {
     id: '1',
-    user: { name: 'Jane Nick', avatar: 'https://i.pravatar.cc/150?u=jane' },
+    user: { name: 'Jane Noah', avatar: 'https://i.pravatar.cc/150?u=jane' },
     outfitImage: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=800&auto=format&fit=crop',
     likes: 342,
     caption: 'Bahar ayları için favori kapsül dolap kombinim! 🌿🧥 Siyah tişört her zaman kurtarır.',
@@ -15,16 +15,16 @@ const MOCK_POSTS = [
   },
   {
     id: '2',
-    user: { name: 'Veli Yılmaz', avatar: 'https://i.pravatar.cc/150?u=zeynep' },
-    outfitImage: 'https://res.cloudinary.com/dujm9gm43/image/upload/v1773245818/ky8jp1wghseiw012oiec.png',
+    user: { name: 'Sophia Charlotte', avatar: 'https://i.pravatar.cc/150?u=jane' },
+    outfitImage: 'https://res.cloudinary.com/dujm9gm43/image/upload/v1777107461/vestify_smart_clothes/sjjcte6czaddggyxsizu.png',
     likes: 128,
     caption: 'Bugün ofis günü. AI stilistimin önerdiği bu ceket harika durdu. 💼✨',
     isLikedByMe: true,
   },
   {
     id: '3',
-    user: { name: 'Caner Tech', avatar: 'https://i.pravatar.cc/150?u=caner' },
-    outfitImage: 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?q=80&w=800&auto=format&fit=crop',
+    user: { name: 'Emma Luna', avatar: 'https://i.pravatar.cc/150?u=jane' },
+    outfitImage: 'https://res.cloudinary.com/dujm9gm43/image/upload/v1777009060/vestify_smart_clothes/elkdmbqygaa60ybs91wr.png',
     likes: 89,
     caption: 'Rahat bir pazar kahvesi kombini. ☕ Minimalizm <3',
     isLikedByMe: false,
@@ -88,7 +88,7 @@ export default function SocialScreen() {
 
       {/* Beğeni Sayısı ve Açıklama */}
       <View style={styles.postFooter}>
-        <Text style={styles.likesText}>{item.likes} beğenme</Text>
+        <Text style={styles.likesText}>{item.likes} likes</Text>
         <Text style={styles.captionText}>
           <Text style={styles.captionUsername}>{item.user.name} </Text>
           {item.caption}
@@ -102,7 +102,7 @@ export default function SocialScreen() {
     <View style={styles.container}>
       {/* Keşfet Başlığı */}
       <View style={styles.header}>
-        <Text style={styles.title}>Keşfet</Text>
+        <Text style={styles.title}>Discover the VESTIFY</Text>
         <TouchableOpacity style={styles.searchButton}>
           <Ionicons name="search" size={24} color="#2C3E50" />
         </TouchableOpacity>
@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
   
   // Üst Başlık
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 50, paddingBottom: 15, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#EEEEEE' },
-  title: { fontSize: 26, fontWeight: '900', color: '#2C3E50', letterSpacing: 0.5 },
+  title: { fontSize: 17, fontWeight: '900', color: '#2C3E50', letterSpacing: 0.5 },
   searchButton: { padding: 5 },
 
   feedContainer: { paddingBottom: 20 },
