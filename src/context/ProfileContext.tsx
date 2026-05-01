@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext } from 'react';
 
-// Sistemin taşıyacağı verilerin tipleri
+// Sistemin taşıyacağı verilerin tipleri | npx expo start -c ile çalışıyor.
 interface ProfileContextType {
   profileImage: string | null;
   setProfileImage: (uri: string | null) => void;

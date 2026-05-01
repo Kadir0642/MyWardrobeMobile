@@ -21,7 +21,7 @@ export default function StylistScreen() {
   const { profileImage } = useProfile();
   const defaultAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
 
-  const [activeTab, setActiveTab] = useState('Canvas'); 
+  const [activeTab, setActiveTab] = useState('Dress Me'); 
   const [is3DMode, setIs3DMode] = useState(false); 
  // 🚀 SABİT TARİH (Sadece bugünü gösterir) 
   const currentDate = new Date();
