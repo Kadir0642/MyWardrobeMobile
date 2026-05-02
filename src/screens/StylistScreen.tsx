@@ -12,12 +12,13 @@ import { ClothingItem } from '../types';
 import AISuggestionsTab from '../components/Stylist/AISuggestionsTab';
 import DressMeTab from '../components/Stylist/DressMeTab';
 import CanvasTab from '../components/Stylist/CanvasTab';
+import ARTryOnTab from '../components/Stylist/ARTryOnTab'; // 🚀 YENİ EKLENEN AR BÖLMESİ
 
 const CURRENT_USER_ID = 1; 
 
 export default function StylistScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation<any>(); // 🚀 Yönlendirme motoru başlatıldı
+  const navigation = useNavigation<any>(); //  Yönlendirme motoru
   const { profileImage } = useProfile();
   const defaultAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
 
@@ -93,10 +94,13 @@ export default function StylistScreen() {
     }, [])
   );
 
+  // 🚀 4'lü sekme isimlerimiz (Ekrana sığması için optimize edildi)
+  const TABS = ['Dress Me', 'Canvas', 'AI-Suggest', 'AR Try-On'];
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
 
-{/* HEADER ALANI */}      
+      {/* HEADER ALANI */}      
       <View style={styles.header}>
         
         {/* SOL: Profil Fotoğrafı */}
@@ -126,20 +130,25 @@ export default function StylistScreen() {
 
       </View>
 
- {/* SEKMELER MENÜSÜ */}
+      {/* SEKMELER MENÜSÜ (4'lü yapıya uyarlandı) */}
       <View style={styles.tabsContainer}>
-        {['Dress Me', 'Canvas', 'AI Suggestions'].map((tab) => (
-          <TouchableOpacity key={tab} style={[styles.tabButton, activeTab === tab && styles.tabButtonActive]} onPress={() => setActiveTab(tab)}>
+        {TABS.map((tab) => (
+          <TouchableOpacity 
+            key={tab} 
+            style={[styles.tabButton, activeTab === tab && styles.tabButtonActive]} 
+            onPress={() => setActiveTab(tab)}
+          >
             <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>{tab}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
-{/* BİLEŞEN YÖNLENDİRİCİ */}
+      {/* BİLEŞEN YÖNLENDİRİCİ */}
       <View style={{ flex: 1 }}>
-        {activeTab === 'AI Suggestions' && <AISuggestionsTab allWardrobe={allWardrobe} weather={weather}/>}
         {activeTab === 'Dress Me' && <DressMeTab allWardrobe={allWardrobe} is3DMode={is3DMode} />}
         {activeTab === 'Canvas' && <CanvasTab allWardrobe={allWardrobe} />}
+        {activeTab === 'AI-Suggest' && <AISuggestionsTab allWardrobe={allWardrobe} weather={weather}/>}
+        {activeTab === 'AR Try-On' && <ARTryOnTab allWardrobe={allWardrobe} />}
       </View>
 
     </View>
@@ -209,10 +218,16 @@ const styles = StyleSheet.create({
     color: '#D1CFC7' 
   },
 
-   //üst tab bar altı çizgi
-  tabsContainer: { flexDirection: 'row', paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#EBE8DF', marginBottom: 5 },
+// 🚀 4'lü yapı için tab stilleri ufak güncellendi (Yazı boyutu biraz küçüldü)
+  tabsContainer: { 
+    flexDirection: 'row', 
+    paddingHorizontal: 10, // Kenar boşlukları kısıldı ki 4 sekme sığsın
+    borderBottomWidth: 1, 
+    borderBottomColor: '#EBE8DF', 
+    marginBottom: 5 
+  },
   tabButton: { flex: 1, paddingVertical: 12, alignItems: 'center' },
   tabButtonActive: { borderBottomWidth: 2, borderBottomColor: '#1A1A1A' },
-  tabText: { fontSize: 14, fontWeight: '600', color: '#A0A0A0' },
+  tabText: { fontSize: 13, fontWeight: '600', color: '#A0A0A0' }, // 14'ten 13'e çekildi
   tabTextActive: { color: '#1A1A1A', fontWeight: '800' }
 });
