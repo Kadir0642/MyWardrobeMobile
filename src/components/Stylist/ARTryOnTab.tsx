@@ -3,14 +3,17 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Animated, 
 import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import ARItemSelectorTray from './ARItemSelectorTray'; 
+import { apiClient } from '../../api/client'; // KENDİ API İSTEMCİMİZ
 
 const { width, height } = Dimensions.get('window');
+const CURRENT_USER_ID = "1";
 
 interface ARTryOnTabProps {
   allWardrobe: any[];
+  allOutfits?: any[];  // Kombinlerin gelmesi için prop eklendi
 }
 
-export default function ARTryOnTab({ allWardrobe }: ARTryOnTabProps) {
+export default function ARTryOnTab({ allWardrobe, allOutfits = [] }: ARTryOnTabProps) {
   const [userPhoto, setUserPhoto] = useState<string | null>(null);
   const [selectedItems, setSelectedItems] = useState<any[]>([]); 
 
@@ -68,7 +71,6 @@ export default function ARTryOnTab({ allWardrobe }: ARTryOnTabProps) {
   const pickImage = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permissionResult.granted) {
-      // 🚀 İNGİLİZCE UI UYARISI
       alert("Gallery permission is required to select a photo.");
       return;
     }
@@ -80,6 +82,32 @@ export default function ARTryOnTab({ allWardrobe }: ARTryOnTabProps) {
     });
     if (!result.canceled) {
       setUserPhoto(result.assets[0].uri);
+    }
+  };
+
+// 🚀 DRESS UP BUTONUNA BASILINCA ÇALIŞACAK FONKSİYON
+  const handleDressUp = async () => {
+    // 1. Gönderilecek paketi (VtonTaskRequest) hazırlıyoruz
+    const requestPayload = {
+      userId: CURRENT_USER_ID, // 🚀 GLOBAL DEĞİŞKEN BURAYA BAĞLANDI
+      personUrl: userPhoto, 
+      garmentUrls: selectedItems.map(item => item.uri), 
+      tuckedIn: false 
+    };
+
+    try {
+      // 2. Kendi apiClient'ımız ile asenkron isteği atıyoruz
+      const response = await apiClient.post('/vton/async-try-on', requestPayload);
+
+      if (response.status === 202) {
+        alert("Success! " + response.data);
+      } else {
+        alert("Warning: Unexpected status code from server.");
+      }
+
+    } catch (error) {
+      console.error("API Connection Error:", error);
+      alert("Failed to connect to the backend.");
     }
   };
 
@@ -106,7 +134,7 @@ export default function ARTryOnTab({ allWardrobe }: ARTryOnTabProps) {
             )}
           </View>
 
-          {/* 🚀 SEÇİLEN PARÇALAR BARI (İNGİLİZCE UI) */}
+          {/* SEÇİLEN PARÇALAR BARI */}
           {selectedItems.length > 0 && (
             <View style={styles.selectedItemsBar}>
               <Text style={styles.selectionTitle}>Items to Try On ({selectedItems.length})</Text>
@@ -140,6 +168,7 @@ export default function ARTryOnTab({ allWardrobe }: ARTryOnTabProps) {
               style={[styles.dressUpButton, (!userPhoto || selectedItems.length === 0) && styles.dressUpButtonDisabled]} 
               activeOpacity={0.8}
               disabled={!userPhoto || selectedItems.length === 0}
+              onPress={handleDressUp} // 🚀 APİ BAĞLANTISI BUTONA EKLENDİ
             >
               <Text style={[styles.dressUpText, (!userPhoto || selectedItems.length === 0) && styles.dressUpTextDisabled]}>
                 Dress up
@@ -157,7 +186,10 @@ export default function ARTryOnTab({ allWardrobe }: ARTryOnTabProps) {
         </View>
 
         <View style={styles.trayInnerContent}>
-          <ARItemSelectorTray allWardrobe={allWardrobe} setSelectedItems={setSelectedItems} />
+          <ARItemSelectorTray 
+          allWardrobe={allWardrobe} 
+          allOutfits={allOutfits}
+          setSelectedItems={setSelectedItems} />
         </View>
       </Animated.View>
 

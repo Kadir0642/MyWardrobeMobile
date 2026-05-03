@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Alert, Dimensions } from 'react-native';
 import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
 interface ARItemSelectorTrayProps {
   allWardrobe: any[];
-  allOutfits?: any[]; // 🚀 API'den gelecek gerçek kombinler listesi
+  allOutfits?: any[]; 
   setSelectedItems: (items: any[]) => void;
 }
 
@@ -15,7 +15,6 @@ export default function ARItemSelectorTray({ allWardrobe, allOutfits = [], setSe
   const [selectedIds, setSelectedIds] = useState<string[]>([]); 
   const [selectedOutfitId, setSelectedOutfitId] = useState<string | null>(null);
 
-  // Tekil kıyafet seçme mantığı (Clothes sekmesi için)
   const toggleItemSelection = (item: any) => {
     setSelectedOutfitId(null); 
     let newSelectedIds = [...selectedIds];
@@ -30,42 +29,43 @@ export default function ARItemSelectorTray({ allWardrobe, allOutfits = [], setSe
     setSelectedItems(newSelectedItems);
   };
 
-  // 🚀 KOMBİN SEÇME MANTIĞI (Gerçek Outfits sekmesi için)
   const handleOutfitSelection = (outfit: any) => {
+    if (!outfit || !outfit.items) return;
+    
     setSelectedOutfitId(outfit.id);
     
-    // Kombin içindeki tüm parçaların ID'lerini al
-    // NOT: Gerçek API verisine göre outfit.items yapısı değişebilir, duruma göre revize ederiz.
-    const outfitItemIds = outfit.items ? outfit.items.map((item: any) => item.id) : [];
+    const outfitItemIds = outfit.items.map((item: any) => item.id);
     setSelectedIds(outfitItemIds);
-    
-    // Ana ekrana kombindeki eşyaları gönder
-    if(outfit.items) setSelectedItems(outfit.items);
+    setSelectedItems(outfit.items);
+  };
+
+  const handleShopClick = () => {
+    setActiveTab('Shop');
+    Alert.alert(
+      "Shop Feature",
+      "We are working on this. We will keep you informed soon.",
+      [{ text: "OK", onPress: () => setActiveTab('Clothes') }] 
+    );
   };
 
   return (
     <View style={styles.trayContainer}>
-
-      {/* PREMİUM SEKMELER */}
       <View style={styles.tabBarContainer}>
         {['Shop', 'Clothes', 'Outfits'].map((tab) => (
           <TouchableOpacity 
             key={tab} 
             style={[styles.tabButton, activeTab === tab && styles.tabButtonActive]}
-            onPress={() => setActiveTab(tab as any)}
+            onPress={() => tab === 'Shop' ? handleShopClick() : setActiveTab(tab as any)}
           >
             {tab === 'Shop' && <Feather name="shopping-bag" size={20} color={activeTab === tab ? "#D4AF37" : "#A0A0A0"} />}
             {tab === 'Clothes' && <MaterialCommunityIcons name="wardrobe-outline" size={22} color={activeTab === tab ? "#D4AF37" : "#A0A0A0"} />}
             {tab === 'Outfits' && <MaterialCommunityIcons name="hanger" size={22} color={activeTab === tab ? "#D4AF37" : "#A0A0A0"} />}
-            
-            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-              {tab}
-            </Text>
+            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>{tab}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      {/* 🚀 SHOP SEKMESİ İÇERİĞİ (Premium Uyarı) */}
+      {/* SHOP SEKMESİ */}
       {activeTab === 'Shop' && (
         <View style={styles.premiumEmptyState}>
           <View style={styles.premiumIconCircle}>
@@ -76,49 +76,54 @@ export default function ARItemSelectorTray({ allWardrobe, allOutfits = [], setSe
         </View>
       )}
 
-      {/* 🚀 OUTFITS SEKMESİ İÇERİĞİ (Gerçek Veri İle) */}
+      {/* 🚀 OUTFITS SEKMESİ (KULLANICININ VERDİĞİ İSİMLE LİSTELENİR) */}
       {activeTab === 'Outfits' && (
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View style={styles.outfitGrid}>
-            {/* Eğer hiç kombin yoksa boş durum mesajı gösterelim */}
             {allOutfits.length === 0 ? (
-               <View style={{alignItems: 'center', marginTop: 40}}>
-                   <Text style={{color: '#666'}}>No outfits found. Create one from the Canvas tab!</Text>
-               </View>
+              <View style={{alignItems: 'center', marginTop: 40}}>
+                <Text style={{color: '#666'}}>No outfits found. Create one from the Canvas tab!</Text>
+              </View>
             ) : (
-                allOutfits.map((outfit) => (
+              allOutfits.map((outfit) => (
                 <TouchableOpacity 
-                    key={outfit.id} 
-                    style={[styles.outfitCard, selectedOutfitId === outfit.id && styles.outfitCardSelected]}
-                    activeOpacity={0.8}
-                    onPress={() => handleOutfitSelection(outfit)}
+                  key={outfit.id} 
+                  style={[styles.outfitCard, selectedOutfitId === outfit.id && styles.outfitCardSelected]}
+                  activeOpacity={0.8}
+                  onPress={() => handleOutfitSelection(outfit)}
                 >
-                    {/* Kombin önizlemesi: İlk 2 parçayı yan yana göster */}
-                    <View style={styles.outfitPreview}>
-                    {outfit.items && outfit.items.slice(0, 2).map((item: any, idx: number) => (
-                        <Image key={idx} source={{ uri: item.uri }} style={styles.outfitThumb} />
+                  <View style={styles.outfitPreview}>
+                    {outfit.items?.slice(0, 2).map((item: any, idx: number) => (
+                      <Image key={idx} source={{ uri: item.uri }} style={styles.outfitThumb} />
                     ))}
-                    {outfit.items && outfit.items.length > 2 && (
-                        <View style={styles.outfitMoreCount}>
+                    {outfit.items?.length > 2 && (
+                      <View style={styles.outfitMoreCount}>
                         <Text style={styles.outfitMoreText}>+{outfit.items.length - 2}</Text>
-                        </View>
+                      </View>
                     )}
-                    </View>
-                    <Text style={styles.outfitName}>{outfit.name}</Text>
+                  </View>
+                  
+                  {/* 🚀 KOMBİN İSMİ: Kullanıcı ne yazdıysa o (outfit.name) */}
+                  <View style={styles.outfitInfoContainer}>
+                    <Text style={styles.outfitName}>
+                      {outfit.name ? outfit.name : 'My Outfit'}
+                    </Text>
+                    <Text style={styles.outfitBrandText}>{outfit.items?.length || 0} Pieces • Vestify Look</Text>
+                  </View>
 
-                    {selectedOutfitId === outfit.id && (
+                  {selectedOutfitId === outfit.id && (
                     <View style={styles.checkBadge}>
-                        <MaterialCommunityIcons name="check-bold" size={14} color="#FFF" />
+                       <MaterialCommunityIcons name="check-bold" size={14} color="#FFF" />
                     </View>
-                    )}
+                  )}
                 </TouchableOpacity>
-                ))
+              ))
             )}
           </View>
         </ScrollView>
       )}
 
-      {/* 🚀 CLOTHES SEKMESİ İÇERİĞİ */}
+      {/* 🚀 CLOTHES SEKMESİ (KULLANICININ GİRDİĞİ MARKA İLE LİSTELENİR) */}
       {activeTab === 'Clothes' && (
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View style={styles.filterSortBar}>
@@ -141,9 +146,16 @@ export default function ARItemSelectorTray({ allWardrobe, allOutfits = [], setSe
                 onPress={() => toggleItemSelection(item)}
               >
                 <Image source={{ uri: item.uri }} style={styles.itemImage} />
+                
+                {/* 🚀 MARKA YAZISI: Kullanıcı ne girdiyse (item.brand), BÜYÜK HARFLE ve şık bir şekilde! */}
+                <Text style={styles.itemBrandText} numberOfLines={1}>
+                  {item.brand ? item.brand.toUpperCase() : (item.category ? item.category.toUpperCase() : 'VESTIFY')}
+                </Text>
+
                 <TouchableOpacity style={styles.heartIcon} activeOpacity={0.7}>
                   <MaterialCommunityIcons name="heart-outline" size={14} color="#666" />
                 </TouchableOpacity>
+
                 {selectedIds.includes(item.id) && (
                   <View style={styles.checkBadge}>
                      <MaterialCommunityIcons name="check-bold" size={14} color="#FFF" />
@@ -154,46 +166,56 @@ export default function ARItemSelectorTray({ allWardrobe, allOutfits = [], setSe
           </View>
         </ScrollView>
       )}
-
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   trayContainer: { flex: 1 },
-
   tabBarContainer: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#EBE8DF', paddingHorizontal: 10 },
   tabButton: { flex: 1, paddingVertical: 12, alignItems: 'center', justifyContent: 'center', gap: 4 },
   tabButtonActive: { borderBottomWidth: 2, borderBottomColor: '#D4AF37' },
   tabText: { fontSize: 12, fontWeight: '600', color: '#A0A0A0' },
   tabTextActive: { color: '#111', fontWeight: '800' },
-
   scrollContent: { paddingHorizontal: 15, paddingBottom: 100, paddingTop: 15 },
   
-  // CLOTHES STİLLERİ
   filterSortBar: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15, paddingHorizontal: 5 },
   sortButton: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFF', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: '#EBE8DF' },
   filterButton: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFF', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: '#EBE8DF' },
   filterSortText: { fontSize: 13, fontWeight: '700', color: '#111' },
 
+  // 🚀 CLOTHES KARTLARI
   gridList: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center' },
-  itemCard: { width: (width * 0.9 - 24) / 3, height: (width * 0.9 - 24) / 3, borderRadius: 20, backgroundColor: '#2A2A2A', borderWidth: 2, borderColor: '#333333', overflow: 'hidden', padding: 8, justifyContent: 'center', alignItems: 'center' },
-  itemCardSelected: { borderColor: '#84ef09', backgroundColor: '#F4F7FE' }, 
-  itemImage: { width: '100%', height: '100%', resizeMode: 'contain' },
-  heartIcon: { position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(255,255,255,0.8)', padding: 4, borderRadius: 12 },
-  checkBadge: { position: 'absolute', bottom: 6, right: 6, backgroundColor: '#84ef09', borderRadius: 12, width: 24, height: 24, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#FFF' },
+  itemCard: { 
+    width: (width * 0.9 - 24) / 3, 
+    height: (width * 0.9 - 24) / 3, 
+    borderRadius: 16, 
+    backgroundColor: '#2A2A2A', 
+    borderWidth: 2, 
+    borderColor: '#333333', 
+    overflow: 'hidden', 
+    padding: 6, 
+    justifyContent: 'space-between', 
+    alignItems: 'center' 
+  },
+  itemCardSelected: { borderColor: '#84ef09', backgroundColor: '#334020' }, 
+  itemImage: { width: '100%', height: '75%', resizeMode: 'contain' },
+  itemBrandText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800', marginTop: 2, textAlign: 'center', letterSpacing: 0.5 },
+  heartIcon: { position: 'absolute', top: 6, right: 6, padding: 2 },
+  checkBadge: { position: 'absolute', bottom: 6, right: 6, backgroundColor: '#84ef09', borderRadius: 12, width: 22, height: 22, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#2A2A2A' },
 
-  // OUTFITS STİLLERİ
+  // 🚀 OUTFITS KARTLARI
   outfitGrid: { flexDirection: 'column', gap: 15 },
   outfitCard: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 15, borderWidth: 2, borderColor: '#EBE8DF', flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 2 },
   outfitCardSelected: { borderColor: '#D4AF37', backgroundColor: '#FAF8F5' },
   outfitPreview: { flexDirection: 'row', gap: -15, marginRight: 15 },
-  outfitThumb: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 2, borderColor: '#FFF', resizeMode: 'cover' },
+  outfitThumb: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 2, borderColor: '#EBE8DF', resizeMode: 'cover' },
   outfitMoreCount: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#1A1A1A', borderWidth: 2, borderColor: '#FFF', justifyContent: 'center', alignItems: 'center' },
   outfitMoreText: { color: '#D4AF37', fontWeight: '800', fontSize: 12 },
-  outfitName: { flex: 1, fontSize: 16, fontWeight: '700', color: '#111' },
+  outfitInfoContainer: { flex: 1, flexDirection: 'column' },
+  outfitName: { fontSize: 16, fontWeight: '700', color: '#111' },
+  outfitBrandText: { fontSize: 11, fontWeight: '600', color: '#888', marginTop: 2 },
 
-  // SHOP (PREMIUM EMPTY STATE) STİLLERİ
   premiumEmptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40, marginTop: -275 },
   premiumIconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(212, 175, 55, 0.1)', justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
   premiumEmptyTitle: { fontSize: 22, fontWeight: '800', color: '#111', marginBottom: 40 },

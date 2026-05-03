@@ -34,7 +34,8 @@ export default function StylistScreen() {
     color: '#D1CFC7' 
   });
   
-  const [allWardrobe, setAllWardrobe] = useState<{id: string, uri: string, category: string}[]>([]);
+  const [allWardrobe, setAllWardrobe] = useState<{id: string, uri: string, category: string, brand?: string}[]>([]); // 1. DÜZELTME: brand eklendi
+  const [allOutfits, setAllOutfits] = useState<any[]>([]); // 2. DÜZELTME: allOutfits state'i eklendi
 
   // ☁️ HAVA DURUMU SİSTEMİ
   useEffect(() => {
@@ -74,23 +75,41 @@ export default function StylistScreen() {
     })();
   }, []);
 
-  useFocusEffect(
+useFocusEffect(
     useCallback(() => {
-      const fetchRealWardrobe = async () => {
+      const fetchRealData = async () => {
         try {
+          // 1. KIYAFETLERİ ÇEKME
           const response = await apiClient.get(`/clothes/${CURRENT_USER_ID}?size=200`);
           const items: ClothingItem[] = response.data.content || response.data;
           const formatted = items.map(item => ({ 
             id: item.id.toString(), 
             uri: item.imageUrl, 
-            category: item.category 
+            category: item.category,
+            brand: item.brand 
           }));
           setAllWardrobe(formatted.reverse());
+
+          // 2. KOMBİNLERİ ÇEKME
+          const outfitsRes = await apiClient.get(`/outfits/${CURRENT_USER_ID}`);
+          const rawOutfits = outfitsRes.data.content || outfitsRes.data || [];
+          const formattedOutfits = rawOutfits.map((outfit: any) => ({
+            id: outfit.id.toString(),
+            name: outfit.name,
+            items: outfit.items.map((item: any) => ({
+              id: item.id.toString(),
+              uri: item.imageUrl || item.uri, 
+              category: item.category,
+              brand: item.brand
+            }))
+          }));
+          setAllOutfits(formattedOutfits.reverse());
+
         } catch (error: any) { 
-          console.error("🚨 Stilist Dolap çekilirken hata: ", error.message); 
+          console.error("🚨 Stilist verileri çekilirken hata: ", error.message); 
         }
       };
-      fetchRealWardrobe();
+      fetchRealData();
     }, [])
   );
 
@@ -148,7 +167,8 @@ export default function StylistScreen() {
         {activeTab === 'Dress Me' && <DressMeTab allWardrobe={allWardrobe} is3DMode={is3DMode} />}
         {activeTab === 'Canvas' && <CanvasTab allWardrobe={allWardrobe} />}
         {activeTab === 'AI-Suggest' && <AISuggestionsTab allWardrobe={allWardrobe} weather={weather}/>}
-        {activeTab === 'AR Try-On' && <ARTryOnTab allWardrobe={allWardrobe} />}
+        {/* 5. DÜZELTME: allOutfits prop'u eklendi */}
+        {activeTab === 'AR Try-On' && <ARTryOnTab allWardrobe={allWardrobe} allOutfits={allOutfits} />}
       </View>
 
     </View>
