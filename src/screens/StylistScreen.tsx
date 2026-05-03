@@ -78,8 +78,9 @@ export default function StylistScreen() {
 useFocusEffect(
     useCallback(() => {
       const fetchRealData = async () => {
+        
+        // 1. KIYAFETLERİ ÇEKME (Kendi Koruma Kalkanı Var)
         try {
-          // 1. KIYAFETLERİ ÇEKME
           const response = await apiClient.get(`/clothes/${CURRENT_USER_ID}?size=200`);
           const items: ClothingItem[] = response.data.content || response.data;
           const formatted = items.map(item => ({ 
@@ -89,25 +90,37 @@ useFocusEffect(
             brand: item.brand 
           }));
           setAllWardrobe(formatted.reverse());
-
-          // 2. KOMBİNLERİ ÇEKME
-          const outfitsRes = await apiClient.get(`/outfits/${CURRENT_USER_ID}`);
-          const rawOutfits = outfitsRes.data.content || outfitsRes.data || [];
-          const formattedOutfits = rawOutfits.map((outfit: any) => ({
-            id: outfit.id.toString(),
-            name: outfit.name,
-            items: outfit.items.map((item: any) => ({
-              id: item.id.toString(),
-              uri: item.imageUrl || item.uri, 
-              category: item.category,
-              brand: item.brand
-            }))
-          }));
-          setAllOutfits(formattedOutfits.reverse());
-
         } catch (error: any) { 
-          console.error("🚨 Stilist verileri çekilirken hata: ", error.message); 
+          console.error("🚨 Kıyafetler çekilirken hata: ", error.message); 
         }
+
+        // 2. KOMBİNLERİ ÇEKME (Kendi Koruma Kalkanı Var)
+        try {
+          // 2. KOMBİNLERİ ÇEKME (Clothes Sorunu Çözüldü)
+          const outfitsRes = await apiClient.get(`/outfits/user/${CURRENT_USER_ID}?size=200`);
+          const rawOutfits = outfitsRes.data.content || outfitsRes.data || [];
+
+          const formattedOutfits = rawOutfits.map((outfit: any) => {
+            // 🚀 LOGDAN GELEN GERÇEK VERİ: Java'daki listenin adı "clothes"
+            const outfitItemsArray = outfit.clothes || []; 
+
+            return {
+              id: outfit.id.toString(),
+              name: outfit.name, 
+              items: outfitItemsArray.map((item: any) => ({
+                id: item.id.toString(),
+                uri: item.imageUrl || item.uri, 
+                category: item.category,
+                brand: item.brand
+              }))
+            };
+          });
+          setAllOutfits(formattedOutfits.reverse());
+        } catch (error: any) { 
+          // 🚀 500 HATASI BURAYA DÜŞECEK AMA UYGULAMAYI BOZMAYACAK
+          console.error("🚨 Kombinler çekilirken (500) backend hatası: ", error.message); 
+        }
+
       };
       fetchRealData();
     }, [])
@@ -167,7 +180,6 @@ useFocusEffect(
         {activeTab === 'Dress Me' && <DressMeTab allWardrobe={allWardrobe} is3DMode={is3DMode} />}
         {activeTab === 'Canvas' && <CanvasTab allWardrobe={allWardrobe} />}
         {activeTab === 'AI-Suggest' && <AISuggestionsTab allWardrobe={allWardrobe} weather={weather}/>}
-        {/* 5. DÜZELTME: allOutfits prop'u eklendi */}
         {activeTab === 'AR Try-On' && <ARTryOnTab allWardrobe={allWardrobe} allOutfits={allOutfits} />}
       </View>
 
