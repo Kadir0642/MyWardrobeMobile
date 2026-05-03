@@ -29,11 +29,20 @@ export default function ARItemSelectorTray({ allWardrobe, allOutfits = [], setSe
     setSelectedItems(newSelectedItems);
   };
 
+// 🚀 KOMBİN SEÇME VE İPTAL ETME (TOGGLE) MANTIĞI
   const handleOutfitSelection = (outfit: any) => {
     if (!outfit || !outfit.items) return;
+
+    // 🚀 EĞER TIKLANAN KOMBİN ZATEN SEÇİLİYSE -> SEÇİMİ İPTAL ET
+    if (selectedOutfitId === outfit.id) {
+      setSelectedOutfitId(null);
+      setSelectedIds([]);
+      setSelectedItems([]);
+      return; // Fonksiyonu burada durdur
+    }
     
+    // EĞER SEÇİLİ DEĞİLSE -> YENİ KOMBİNİ SEÇ
     setSelectedOutfitId(outfit.id);
-    
     const outfitItemIds = outfit.items.map((item: any) => item.id);
     setSelectedIds(outfitItemIds);
     setSelectedItems(outfit.items);
