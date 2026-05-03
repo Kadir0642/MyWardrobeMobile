@@ -14,21 +14,20 @@ export default function ARTryOnTab({ allWardrobe }: ARTryOnTabProps) {
   const [userPhoto, setUserPhoto] = useState<string | null>(null);
   const [selectedItems, setSelectedItems] = useState<any[]>([]); 
 
-  // 🚀 3 KADEMELİ TEPSİ MATEMATİĞİ (GÜNCELLENDİ VE GARANTİLENDİ)
-  const TRAY_HEIGHT = height * 0.85; // Tepsinin tam boyu (Ekranın %85'i)
-  const PEEK_Y = TRAY_HEIGHT - 90;   // KAPALI HALİ (Sadece 90px'lik sapı görünür, gerisi aşağı itilir)
-  const MID_Y = TRAY_HEIGHT * 0.4;   // YARIM AÇIK HALİ
-  const TOP_Y = 0;                   // TAM AÇIK HALİ
+  // 🚀 3 KADEMELİ TEPSİ MATEMATİĞİ
+  const TRAY_HEIGHT = height * 0.85; 
+  const PEEK_Y = TRAY_HEIGHT - 90;   
+  const MID_Y = TRAY_HEIGHT * 0.4;   
+  const TOP_Y = 0;                   
 
-  // Başlangıçta kapalı konumda başlasın
   const translateY = useRef(new Animated.Value(PEEK_Y)).current;
 
-  // Boşluğa tıklayınca tepsiyi PEEK (kapalı) konumuna gönderen fonksiyon
+  // Boşluğa tıklayınca tepsiyi kapat
   const closeTray = () => {
     Animated.spring(translateY, { toValue: PEEK_Y, useNativeDriver: false, friction: 7, tension: 40 }).start();
   };
 
-  // 🚀 SÜRÜKLEME VE YAPIŞTIRMA (SNAP) MEKANİZMASI
+  // 🚀 SÜRÜKLEME VE YAPIŞTIRMA MEKANİZMASI
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -37,7 +36,6 @@ export default function ARTryOnTab({ allWardrobe }: ARTryOnTabProps) {
         translateY.setValue(0);
       },
       onPanResponderMove: (_, gestureState) => {
-        // Tepsiyi parmakla hareket ettir
         translateY.setValue(gestureState.dy);
       },
       onPanResponderRelease: (_, gestureState) => {
@@ -47,16 +45,11 @@ export default function ARTryOnTab({ allWardrobe }: ARTryOnTabProps) {
 
         let targetY = PEEK_Y;
 
-        // Yukarı hızlı kaydırıldıysa (vy eksidir)
         if (vy < -0.5) {
           targetY = currentY < MID_Y ? TOP_Y : MID_Y;
-        } 
-        // Aşağı hızlı kaydırıldıysa (vy artıdır)
-        else if (vy > 0.5) {
+        } else if (vy > 0.5) {
           targetY = currentY > MID_Y ? PEEK_Y : MID_Y;
-        } 
-        // Yavaş bırakıldıysa en yakın konuma yapıştır
-        else {
+        } else {
           const distToTop = Math.abs(currentY - TOP_Y);
           const distToMid = Math.abs(currentY - MID_Y);
           const distToPeek = Math.abs(currentY - PEEK_Y);
@@ -66,9 +59,7 @@ export default function ARTryOnTab({ allWardrobe }: ARTryOnTabProps) {
           else targetY = PEEK_Y;
         }
 
-        // Tepsinin sınır dışına çıkmasını engelle
         targetY = Math.max(TOP_Y, Math.min(PEEK_Y, targetY));
-
         Animated.spring(translateY, { toValue: targetY, useNativeDriver: false, friction: 7, tension: 40 }).start();
       }
     })
@@ -77,7 +68,8 @@ export default function ARTryOnTab({ allWardrobe }: ARTryOnTabProps) {
   const pickImage = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permissionResult.granted) {
-      alert("Fotoğraf seçebilmek için galeri erişim izni vermeniz gerekiyor.");
+      // 🚀 İNGİLİZCE UI UYARISI
+      alert("Gallery permission is required to select a photo.");
       return;
     }
     let result = await ImagePicker.launchImageLibraryAsync({
@@ -94,7 +86,6 @@ export default function ARTryOnTab({ allWardrobe }: ARTryOnTabProps) {
   return (
     <View style={styles.container}>
       
-      {/* 🚀 BOŞLUĞA TIKLAYINCA TEPSİYİ KAPATAN GÖRÜNMEZ SARICI */}
       <TouchableWithoutFeedback onPress={closeTray}>
         <View style={styles.topContentWrapper}>
           
@@ -115,10 +106,10 @@ export default function ARTryOnTab({ allWardrobe }: ARTryOnTabProps) {
             )}
           </View>
 
-          {/* SEÇİLEN PARÇALAR BARI */}
+          {/* 🚀 SEÇİLEN PARÇALAR BARI (İNGİLİZCE UI) */}
           {selectedItems.length > 0 && (
             <View style={styles.selectedItemsBar}>
-              <Text style={styles.selectionTitle}>Giydirilecek Parçalar ({selectedItems.length})</Text>
+              <Text style={styles.selectionTitle}>Items to Try On ({selectedItems.length})</Text>
               <View style={styles.selectedItemsScroll}>
                 {selectedItems.slice(0, 4).map((item, index) => (
                   <View key={index} style={styles.selectedItemBubble}>
@@ -159,19 +150,15 @@ export default function ARTryOnTab({ allWardrobe }: ARTryOnTabProps) {
         </View>
       </TouchableWithoutFeedback>
 
-      {/* 🚀 SÜRÜKLENEBİLİR 3 KADEMELİ TEPSİ */}
+      {/* SÜRÜKLENEBİLİR TEPSİ */}
       <Animated.View style={[styles.trayWrapper, { height: TRAY_HEIGHT, transform: [{ translateY }] }]}>
-        
-        {/* TUTMA ÇUBUĞU ALANI (Sadece buradan tutulup sürüklenir) */}
         <View {...panResponder.panHandlers} style={styles.dragZone}>
           <View style={styles.bronzeHandleBar} />
         </View>
 
-        {/* TEPSİ İÇERİĞİ */}
         <View style={styles.trayInnerContent}>
           <ARItemSelectorTray allWardrobe={allWardrobe} setSelectedItems={setSelectedItems} />
         </View>
-
       </Animated.View>
 
     </View>
@@ -180,15 +167,7 @@ export default function ARTryOnTab({ allWardrobe }: ARTryOnTabProps) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F7F7F7', alignItems: 'center' },
-  
-  topContentWrapper: {
-    flex: 1,
-    width: '100%',
-    alignItems: 'center',
-    paddingBottom: 110, // Tepsinin kapalı halinin butonları gizlememesi için
-    justifyContent: 'space-evenly', 
-  },
-
+  topContentWrapper: { flex: 1, width: '100%', alignItems: 'center', paddingBottom: 110, justifyContent: 'space-evenly' },
   mainCard: { width: width * 0.90, height: height * 0.42, backgroundColor: '#FFFFFF', borderRadius: 30, padding: 0, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3, position: 'relative', overflow: 'hidden', borderWidth: 1, borderColor: '#F0F0F0' },
   addPhotoButton: { position: 'absolute', top: 9, right: 5, flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0F0F0', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 20, zIndex: 10, gap: 6 },
   addPhotoText: { fontSize: 13, fontWeight: '600', color: '#111' },
@@ -196,7 +175,6 @@ const styles = StyleSheet.create({
   silhouetteImage: { width: 180, height: 230, resizeMode: 'contain', opacity: 0.85 },
   uploadText: { fontSize: 14, color: '#888', fontWeight: '500', marginTop: 10, textAlign: 'center' },
   uploadedImage: { width: '100%', height: '100%', borderRadius: 30, resizeMode: 'cover' },
-
   selectedItemsBar: { width: width * 0.9, backgroundColor: '#FFFFFF', borderRadius: 20, padding: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 2, borderWidth: 1, borderColor: '#EBE8DF' },
   selectionTitle: { fontSize: 12, fontWeight: '700', color: '#111', marginBottom: 8, opacity: 0.6 },
   selectedItemsScroll: { flexDirection: 'row', gap: 10, alignItems: 'center' },
@@ -204,29 +182,14 @@ const styles = StyleSheet.create({
   selectedItemImg: { width: '100%', height: '100%', borderRadius: 18 },
   moreBubble: { backgroundColor: '#F0F0F0', justifyContent: 'center', alignItems: 'center' },
   moreText: { fontSize: 14, fontWeight: '700', color: '#666' },
-
   actionBar: { width: width * 0.9, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   leftActions: { flexDirection: 'row', gap: 12 },
   iconButton: { width: 44, height: 44, backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center', borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 2, borderWidth: 1, borderColor: '#F0F0F0' },
-  
-  // DRESS UP BUTONU
   dressUpButton: { backgroundColor: '#CCFF00', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 25, shadowColor: '#CCFF00', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 4 },
   dressUpButtonDisabled: { backgroundColor: '#EBE8DF', shadowOpacity: 0 },
   dressUpText: { fontSize: 15, fontWeight: '800', color: '#111', letterSpacing: 0.5 },
   dressUpTextDisabled: { color: '#999' },
-
-  // 🚀 TEPSİ STİLLERİ (KESİN GÖRÜNÜR)
-  trayWrapper: { 
-    position: 'absolute', 
-    bottom: 0, // 👈 Alta çivilendi!
-    left: 0,
-    width: width, 
-    backgroundColor: '#EFEFE5', 
-    borderTopLeftRadius: 30, 
-    borderTopRightRadius: 30, 
-    shadowColor: '#000', shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 20,
-    zIndex: 999 // 👈 Asla altta kalmaz
-  },
+  trayWrapper: { position: 'absolute', bottom: 0, left: 0, width: width, backgroundColor: '#EFEFE5', borderTopLeftRadius: 30, borderTopRightRadius: 30, shadowColor: '#000', shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 20, zIndex: 999 },
   dragZone: { width: '100%', height: 40, justifyContent: 'center', alignItems: 'center', backgroundColor: 'transparent' },
   bronzeHandleBar: { backgroundColor: '#D4AF37', width: 60, height: 6, borderRadius: 3, opacity: 0.8 },
   trayInnerContent: { flex: 1 }
