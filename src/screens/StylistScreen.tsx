@@ -126,7 +126,7 @@ useFocusEffect(
     }, [])
   );
 
-  // 🚀 4'lü sekme isimlerimiz (Ekrana sığması için optimize edildi)
+  // 4'lü sekme isimlerimiz (Ekrana sığması için optimize edildi)
   const TABS = ['Dress Me', 'Canvas', 'AI-Suggest', 'AR Try-On'];
 
   return (
