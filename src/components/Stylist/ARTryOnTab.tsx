@@ -85,31 +85,69 @@ export default function ARTryOnTab({ allWardrobe, allOutfits = [] }: ARTryOnTabP
     }
   };
 
-// 🚀 DRESS UP BUTONUNA BASILINCA ÇALIŞACAK FONKSİYON
-  const handleDressUp = async () => {
+  // 🚀 AKILLI POLLING (SMART POLLING) MANTIĞI  -> Akıllıca client - server ilişkisini kontrol eder.
+  const checkVtonResult = async (taskId: string, attempt: number = 1) => {
+    // Toplam 5 deneme (3s + 6s + 9s + 12s + 15s = 45 saniye maksimum bekleme)
+    if (attempt > 5) {
+      alert("Timeout: The process is taking too long. Please try again later.");
+      return;
+    }
+
+    const waitTime = attempt * 3000; // Her denemede süreyi katla (3000ms, 6000ms...)
+    console.log(`[POLLING] Attempt ${attempt}: Waiting ${waitTime / 1000} seconds...`);
+
+    setTimeout(async () => {
+      try {
+        // 🚀 DİKKAT: Bu endpoint'i Java tarafında oluşturacağız
+        const response = await apiClient.get(`/vton/result/${taskId}`);
+        
+        if (response.data && response.data.status === 'COMPLETED') {
+          // İŞLEM BİTTİ! Dönen AI görselini ekranda göster
+          console.log("🔥 AI GİYDİRME BAŞARILI:", response.data.resultImageUrl);
+          alert("Dress up completed!");
+          // İleride burada setUserPhoto(response.data.resultImageUrl) tarzı bir şey yapacağız
+        } else {
+          // İşlem devam ediyorsa (PENDING), bir sonraki denemeye geç
+          checkVtonResult(taskId, attempt + 1);
+        }
+      } catch (error) {
+        console.error(`Polling attempt ${attempt} failed:`, error);
+        // Ağ hatası olsa bile pes etme, devam et
+        checkVtonResult(taskId, attempt + 1);
+      }
+    }, waitTime);
+  };
+
+
+    // 🚀 DRESS UP BUTONUNA BASILINCA ÇALIŞACAK FONKSİYON
+    const handleDressUp = async () => {
     // 1. Gönderilecek paketi (VtonTaskRequest) hazırlıyoruz
     const requestPayload = {
-      userId: CURRENT_USER_ID, // 🚀 GLOBAL DEĞİŞKEN BURAYA BAĞLANDI
+      userId: CURRENT_USER_ID, // GLOBAL DEĞİŞKEN BURAYA BAĞLANDI
       personUrl: userPhoto, 
       garmentUrls: selectedItems.map(item => item.uri), 
       tuckedIn: false 
     };
 
     try {
-      // 2. Kendi apiClient'ımız ile asenkron isteği atıyoruz
-      const response = await apiClient.post('/vton/async-try-on', requestPayload);
+          const response = await apiClient.post('/vton/async-try-on', requestPayload);
 
-      if (response.status === 202) {
-        alert("Success! " + response.data);
-      } else {
-        alert("Warning: Unexpected status code from server.");
-      }
+          if (response.status === 202) {
+            // 1. Backend isteği kabul etti ve bir Tracking/Task ID döndü
+            const taskId = response.data.taskId || response.data; // Java'nın dönüş modeline göre ayarlarız
+            console.log("İşlem sıraya alındı. Task ID:", taskId);
+            
+            // 2. Akıllı Polling'i başlat (1. denemeden itibaren)
+            checkVtonResult(taskId, 1); 
+          } else {
+            alert("Warning: Unexpected status code from server.");
+          }
 
-    } catch (error) {
-      console.error("API Connection Error:", error);
-      alert("Failed to connect to the backend.");
-    }
-  };
+        } catch (error) {
+          console.error("API Connection Error:", error);
+          alert("Failed to connect to the backend.");
+        }
+      };
 
   return (
     <View style={styles.container}>
