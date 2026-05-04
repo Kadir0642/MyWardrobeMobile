@@ -1,9 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Animated, PanResponder, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Animated, PanResponder, TouchableWithoutFeedback, ActivityIndicator, Vibration } from 'react-native'; // 🚀 Vibration ve ActivityIndicator eklendi!
 import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import ARItemSelectorTray from './ARItemSelectorTray'; 
-import { apiClient } from '../../api/client'; // KENDİ API İSTEMCİMİZ
+import { apiClient } from '../../api/client'; 
+import PremiumToast from '../PremiumToast';
 
 const { width, height } = Dimensions.get('window');
 const CURRENT_USER_ID = "1";
@@ -17,15 +18,18 @@ export default function ARTryOnTab({ allWardrobe, allOutfits = [] }: ARTryOnTabP
   const [userPhoto, setUserPhoto] = useState<string | null>(null);
   const [selectedItems, setSelectedItems] = useState<any[]>([]); 
 
-  // 🚀 3 KADEMELİ TEPSİ MATEMATİĞİ
+  // Yükleme Ekranı ve Toast Bildirimi İçin State'ler
+  const [isLoading, setIsLoading] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
+
+  // 3 KADEMELİ TEPSİ MATEMATİĞİ
   const TRAY_HEIGHT = height * 0.85; 
   const PEEK_Y = TRAY_HEIGHT - 90;   
   const MID_Y = TRAY_HEIGHT * 0.4;   
   const TOP_Y = 0;                   
 
   const translateY = useRef(new Animated.Value(PEEK_Y)).current;
-
-  // Boşluğa tıklayınca tepsiyi kapat
+// Boşluğa tıklayınca tepsiyi kapat
   const closeTray = () => {
     Animated.spring(translateY, { toValue: PEEK_Y, useNativeDriver: false, friction: 7, tension: 40 }).start();
   };
@@ -75,7 +79,7 @@ export default function ARTryOnTab({ allWardrobe, allOutfits = [] }: ARTryOnTabP
       return;
     }
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images, 
+      mediaTypes: ['images'], 
       allowsEditing: true, 
       aspect: [3, 4],
       quality: 1, 
@@ -83,29 +87,33 @@ export default function ARTryOnTab({ allWardrobe, allOutfits = [] }: ARTryOnTabP
     if (!result.canceled) {
       setUserPhoto(result.assets[0].uri);
     }
-  };
+  }
 
   // 🚀 AKILLI POLLING (SMART POLLING) MANTIĞI  -> Akıllıca client - server ilişkisini kontrol eder.
   const checkVtonResult = async (taskId: string, attempt: number = 1) => {
-    // Toplam 5 deneme (3s + 6s + 9s + 12s + 15s = 45 saniye maksimum bekleme)
     if (attempt > 5) {
+      setIsLoading(false); 
       alert("Timeout: The process is taking too long. Please try again later.");
       return;
     }
 
-    const waitTime = attempt * 3000; // Her denemede süreyi katla (3000ms, 6000ms...)
+    const waitTime = attempt * 3000;  // Her denemede süreyi katla (3000ms, 6000ms...)
     console.log(`[POLLING] Attempt ${attempt}: Waiting ${waitTime / 1000} seconds...`);
 
     setTimeout(async () => {
       try {
-        // 🚀 DİKKAT: Bu endpoint'i Java tarafında oluşturacağız
         const response = await apiClient.get(`/vton/result/${taskId}`);
         
         if (response.data && response.data.status === 'COMPLETED') {
           // İŞLEM BİTTİ! Dönen AI görselini ekranda göster
           console.log("🔥 AI GİYDİRME BAŞARILI:", response.data.resultImageUrl);
-          alert("Dress up completed!");
-          // İleride burada setUserPhoto(response.data.resultImageUrl) tarzı bir şey yapacağız
+
+          setUserPhoto(response.data.resultImageUrl);
+          setIsLoading(false); 
+
+          // 🚀 EN HAVALI KISIM: Telefon titrer ve Premium Toast iner!
+          Vibration.vibrate(400); // 400 milisaniye tok bir titreşim
+          setToastVisible(true); 
         } else {
           // İşlem devam ediyorsa (PENDING), bir sonraki denemeye geç
           checkVtonResult(taskId, attempt + 1);
@@ -119,11 +127,12 @@ export default function ARTryOnTab({ allWardrobe, allOutfits = [] }: ARTryOnTabP
   };
 
 
-    // 🚀 DRESS UP BUTONUNA BASILINCA ÇALIŞACAK FONKSİYON
-    const handleDressUp = async () => {
-    // 1. Gönderilecek paketi (VtonTaskRequest) hazırlıyoruz
+  // 🚀 DRESS UP BUTONUNA BASILINCA ÇALIŞACAK FONKSİYON
+  const handleDressUp = async () => {
+    setIsLoading(true); // 🚀 Üstteki ince barı göster, ekranı kitleme!
+    
     const requestPayload = {
-      userId: CURRENT_USER_ID, // GLOBAL DEĞİŞKEN BURAYA BAĞLANDI
+      userId: CURRENT_USER_ID, 
       personUrl: userPhoto, 
       garmentUrls: selectedItems.map(item => item.uri), 
       tuckedIn: false 
@@ -132,18 +141,18 @@ export default function ARTryOnTab({ allWardrobe, allOutfits = [] }: ARTryOnTabP
     try {
           const response = await apiClient.post('/vton/async-try-on', requestPayload);
 
-          if (response.status === 202) {
-            // 1. Backend isteği kabul etti ve bir Tracking/Task ID döndü
+          if (response.status === 202) { // 1. Backend isteği kabul etti ve bir Tracking/Task ID döndü
             const taskId = response.data.taskId || response.data; // Java'nın dönüş modeline göre ayarlarız
             console.log("İşlem sıraya alındı. Task ID:", taskId);
-            
             // 2. Akıllı Polling'i başlat (1. denemeden itibaren)
             checkVtonResult(taskId, 1); 
           } else {
+            setIsLoading(false);
             alert("Warning: Unexpected status code from server.");
           }
 
         } catch (error) {
+          setIsLoading(false); 
           console.error("API Connection Error:", error);
           alert("Failed to connect to the backend.");
         }
@@ -151,11 +160,26 @@ export default function ARTryOnTab({ allWardrobe, allOutfits = [] }: ARTryOnTabP
 
   return (
     <View style={styles.container}>
-      
+
+      {/* BAŞARILI BİLDİRİMİ */}
+      <PremiumToast 
+         visible={toastVisible} 
+         message="Dress up perfectly applied!" 
+         onHide={() => setToastVisible(false)} 
+      />
+
+      {/* 🚀 YENİ NON-BLOCKING YÜKLEME BARI tepede çıkar */}
+      {isLoading && (
+        <Animated.View style={styles.loadingBanner}>
+          <Text style={styles.loadingBannerText}>Fitting garments ⏳</Text>
+          <ActivityIndicator size="small" color="#84CC16" /> 
+        </Animated.View>
+      )}
+
       <TouchableWithoutFeedback onPress={closeTray}>
         <View style={styles.topContentWrapper}>
           
-          {/* 1. ANA KART */}
+          {/* ANA KART */}
           <View style={styles.mainCard}>
             <TouchableOpacity style={styles.addPhotoButton} activeOpacity={0.7} onPress={pickImage}>
               <Feather name="camera" size={16} color="#111" />
@@ -203,13 +227,13 @@ export default function ARTryOnTab({ allWardrobe, allOutfits = [] }: ARTryOnTabP
             </View>
 
             <TouchableOpacity 
-              style={[styles.dressUpButton, (!userPhoto || selectedItems.length === 0) && styles.dressUpButtonDisabled]} 
+              style={[styles.dressUpButton, (!userPhoto || selectedItems.length === 0 || isLoading) && styles.dressUpButtonDisabled]} 
               activeOpacity={0.8}
-              disabled={!userPhoto || selectedItems.length === 0}
-              onPress={handleDressUp} // 🚀 APİ BAĞLANTISI BUTONA EKLENDİ
+              disabled={!userPhoto || selectedItems.length === 0 || isLoading}
+              onPress={handleDressUp}  // 🚀 APİ BAĞLANTISI BUTONA EKLENDİ
             >
-              <Text style={[styles.dressUpText, (!userPhoto || selectedItems.length === 0) && styles.dressUpTextDisabled]}>
-                Dress up
+              <Text style={[styles.dressUpText, (!userPhoto || selectedItems.length === 0 || isLoading) && styles.dressUpTextDisabled]}>
+                {isLoading ? "Processing..." : "Dress up"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -262,5 +286,32 @@ const styles = StyleSheet.create({
   trayWrapper: { position: 'absolute', bottom: 0, left: 0, width: width, backgroundColor: '#EFEFE5', borderTopLeftRadius: 30, borderTopRightRadius: 30, shadowColor: '#000', shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 20, zIndex: 999 },
   dragZone: { width: '100%', height: 40, justifyContent: 'center', alignItems: 'center', backgroundColor: 'transparent' },
   bronzeHandleBar: { backgroundColor: '#D4AF37', width: 60, height: 6, borderRadius: 3, opacity: 0.8 },
-  trayInnerContent: { flex: 1 }
+  trayInnerContent: { flex: 1 },
+
+  // 🚀 YENİ EKLENEN STİLLER (Non-blocking Banner)
+  loadingBanner: {
+    position: 'absolute',
+    top: 20, // Çentiğin/Header'ın hemen altına iner
+    alignSelf: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 30,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 15,
+    elevation: 10,
+    zIndex: 1000,
+    borderWidth: 1,
+    borderColor: '#EBE8DF',
+  },
+  loadingBannerText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1A1A1A',
+  }
 });
