@@ -1,117 +1,155 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, FlatList, Image, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { StyleSheet, Text, View, FlatList, Image, TouchableOpacity, Dimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Feather, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useProfile } from '../context/ProfileContext';
 
-// 1. MOCK DATA (Şimdilik sahte verilerle topluluğu simüle ediyoruz)
-// İleride Java'da "OutfitPost" adında bir tablo yapıp bunları oradan çekeceğiz.
-const MOCK_POSTS = [
+const { width } = Dimensions.get('window');
+
+// 🌟 ADMIN/MOCK DATA: Faz 1 için sadece resmi hesap veya seçili kaliteli içerikler
+const FEED_DATA = [
   {
     id: '1',
-    user: { name: 'Jane Noah', avatar: 'https://i.pravatar.cc/150?u=jane' },
-    outfitImage: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=800&auto=format&fit=crop',
-    likes: 342,
-    caption: 'Bahar ayları için favori kapsül dolap kombinim! 🌿🧥 Siyah tişört her zaman kurtarır.',
-    isLikedByMe: false,
+    username: 'linneaborgs',
+    subtitle: 'suggested for you',
+    userAvatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100',
+    postImage: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800', // Mockup'a benzer şık bir kaban kombini
+    likes: 165,
+    isLiked: false,
+    isSaved: false,
   },
   {
     id: '2',
-    user: { name: 'Sophia Charlotte', avatar: 'https://i.pravatar.cc/150?u=jane' },
-    outfitImage: 'https://res.cloudinary.com/dujm9gm43/image/upload/v1777107461/vestify_smart_clothes/sjjcte6czaddggyxsizu.png',
-    likes: 128,
-    caption: 'Bugün ofis günü. AI stilistimin önerdiği bu ceket harika durdu. 💼✨',
-    isLikedByMe: true,
-  },
-  {
-    id: '3',
-    user: { name: 'Emma Luna', avatar: 'https://i.pravatar.cc/150?u=jane' },
-    outfitImage: 'https://res.cloudinary.com/dujm9gm43/image/upload/v1777009060/vestify_smart_clothes/elkdmbqygaa60ybs91wr.png',
+    username: 'antoniooo111',
+    subtitle: 'suggested for you',
+    userAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100',
+    postImage: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800', // Sokak stili
     likes: 89,
-    caption: 'Rahat bir pazar kahvesi kombini. ☕ Minimalizm <3',
-    isLikedByMe: false,
+    isLiked: true,
+    isSaved: true,
   }
 ];
 
 export default function SocialScreen() {
-  const [posts, setPosts] = useState(MOCK_POSTS);
+  const insets = useSafeAreaInsets();
+  const { profileImage } = useProfile();
+  const defaultAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
+  
+  // Şimdilik ismi statik veriyoruz, ileride veritabanından gelecek
+  const userName = "Jane"; 
 
-  // Beğeni (Like) Fonksiyonu
-  const toggleLike = (postId: string) => {
-    setPosts(currentPosts => 
-      currentPosts.map(post => {
-        if (post.id === postId) {
-          return {
-            ...post,
-            isLikedByMe: !post.isLikedByMe,
-            likes: post.isLikedByMe ? post.likes - 1 : post.likes + 1
-          };
-        }
-        return post;
-      })
-    );
+  const [posts, setPosts] = useState(FEED_DATA);
+
+  // Etkileşim Fonksiyonları
+  const toggleLike = (id: string) => {
+    setPosts(prev => prev.map(p => {
+      if (p.id === id) {
+        return { ...p, isLiked: !p.isLiked, likes: p.isLiked ? p.likes - 1 : p.likes + 1 };
+      }
+      return p;
+    }));
   };
 
-  // 2. HER BİR GÖNDERİNİN TASARIMI (Instagram Kartı Tarzı)
-  const renderPost = ({ item }: { item: typeof MOCK_POSTS[0] }) => (
+  const toggleSave = (id: string) => {
+    setPosts(prev => prev.map(p => p.id === id ? { ...p, isSaved: !p.isSaved } : p));
+  };
+
+  // 📸 BİREYSEL GÖNDERİ KARTI TASARIMI
+  const renderPost = ({ item }: { item: typeof FEED_DATA[0] }) => (
     <View style={styles.postContainer}>
       
-      {/* Gönderi Üst Bilgisi (Avatar ve İsim) */}
-      <View style={styles.postHeader}>
-        <Image source={{ uri: item.user.avatar }} style={styles.avatar} />
-        <Text style={styles.username}>{item.user.name}</Text>
-        <TouchableOpacity style={styles.moreOptions}>
-          <Ionicons name="ellipsis-horizontal" size={20} color="#7F8C8D" />
-        </TouchableOpacity>
-      </View>
+      {/* GÖRSEL VE ÜST BİLGİLER */}
+      <View style={styles.imageWrapper}>
+        <Image source={{ uri: item.postImage }} style={styles.postImage} />
+        
+        {/* Yazıların okunması için üstten aşağı kararan gradient maske */}
+        <LinearGradient 
+          colors={['rgba(0,0,0,0.6)', 'transparent']} 
+          style={styles.gradientMask}
+        />
 
-      {/* Dev Kombin Fotoğrafı */}
-      <Image source={{ uri: item.outfitImage }} style={styles.postImage} resizeMode="cover" />
-
-      {/* Etkileşim Çubuğu (Beğen, Yorum, Kaydet) */}
-      <View style={styles.interactionBar}>
-        <View style={styles.leftActions}>
-          <TouchableOpacity onPress={() => toggleLike(item.id)} style={styles.actionIcon}>
-            <Ionicons name={item.isLikedByMe ? "heart" : "heart-outline"} size={28} color={item.isLikedByMe ? "#E74C3C" : "#2C3E50"} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionIcon}>
-            <Ionicons name="chatbubble-outline" size={26} color="#2C3E50" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionIcon}>
-            <Ionicons name="paper-plane-outline" size={26} color="#2C3E50" />
+        <View style={styles.postHeaderOverlay}>
+          <View style={styles.postHeaderLeft}>
+            <Image source={{ uri: item.userAvatar }} style={styles.postAvatar} />
+            <View>
+              <Text style={styles.postUsername}>{item.username}</Text>
+              <Text style={styles.postSubtitle}>{item.subtitle}</Text>
+            </View>
+          </View>
+          
+          <TouchableOpacity style={styles.followButton} onPress={() => alert('Following is a Phase 2 feature!')}>
+            <Text style={styles.followButtonText}>Follow</Text>
           </TouchableOpacity>
         </View>
-        
-        {/* Koleksiyona Kaydet Butonu */}
-        <TouchableOpacity>
-          <Ionicons name="bookmark-outline" size={26} color="#2C3E50" />
-        </TouchableOpacity>
       </View>
 
-      {/* Beğeni Sayısı ve Açıklama */}
-      <View style={styles.postFooter}>
-        <Text style={styles.likesText}>{item.likes} likes</Text>
-        <Text style={styles.captionText}>
-          <Text style={styles.captionUsername}>{item.user.name} </Text>
-          {item.caption}
-        </Text>
+      {/* ALT ETKİLEŞİM ÇUBUĞU (Mockuptaki gibi resmin altında) */}
+      <View style={styles.actionBar}>
+        <View style={styles.actionLeft}>
+          <TouchableOpacity onPress={() => toggleSave(item.id)} style={styles.actionIcon}>
+            <Feather name="bookmark" size={26} color={item.isSaved ? "#1A1A1A" : "#1A1A1A"} />
+            {/* İçi dolu ikon için FontAwesome vs kullanılabilir, şimdilik Feather kullanıldı */}
+          </TouchableOpacity>
+          
+          <TouchableOpacity onPress={() => toggleLike(item.id)} style={[styles.actionIcon, { flexDirection: 'row', alignItems: 'center' }]}>
+            <MaterialCommunityIcons 
+              name={item.isLiked ? "heart" : "heart-outline"} 
+              size={28} 
+              color={item.isLiked ? "#FF3B30" : "#1A1A1A"} 
+            />
+            <Text style={styles.likesText}>{item.likes}</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.actionRight}>
+          <TouchableOpacity style={styles.actionIcon} onPress={() => alert('Post reported to admins.')}>
+            <Feather name="flag" size={24} color="#1A1A1A" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionIcon} onPress={() => alert('Share menu opened.')}>
+            <Feather name="send" size={24} color="#1A1A1A" />
+          </TouchableOpacity>
+        </View>
       </View>
 
     </View>
   );
 
   return (
-    <View style={styles.container}>
-      {/* Keşfet Başlığı */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Discover the VESTIFY</Text>
-        <TouchableOpacity style={styles.searchButton}>
-          <Ionicons name="search" size={24} color="#2C3E50" />
-        </TouchableOpacity>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      
+      {/* 🚀 ÜST KİŞİSEL SELAMLAMA */}
+      <View style={styles.greetingRow}>
+        <Image source={{ uri: profileImage || defaultAvatar }} style={styles.myAvatar} />
+        <View style={styles.greetingPill}>
+          <Text style={styles.greetingText}>Hey, {userName} !</Text>
+        </View>
       </View>
 
-      {/* Kaydırılabilir Sosyal Akış (Feed) */}
+      {/* 🚀 ANA HEADER (Başlık ve 3'lü İkon Seti) */}
+      <View style={styles.headerRow}>
+        <View style={styles.titleWrapper}>
+          <Text style={styles.mainTitle}>Discover the VESTIFY</Text>
+          <View style={styles.titleUnderline} />
+        </View>
+        
+        <View style={styles.headerIcons}>
+          <TouchableOpacity style={styles.topIconBtn} onPress={() => alert('Top 3 Trending Outfits!')}>
+            <MaterialCommunityIcons name="fire" size={28} color="#1A1A1A" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.topIconBtn}>
+            <Feather name="bell" size={24} color="#1A1A1A" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.topIconBtn}>
+            <Feather name="search" size={24} color="#1A1A1A" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* 🚀 GÖNDERİ AKIŞI (FEED) */}
       <FlatList
         data={posts}
-        keyExtractor={item => item.id}
+        keyExtractor={(item) => item.id}
         renderItem={renderPost}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.feedContainer}
@@ -121,35 +159,44 @@ export default function SocialScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FAFAFA' },
+  container: { flex: 1, backgroundColor: '#FFFFFF' }, // Arka plan tamamen beyaz
+
+  // SELAMLAMA KISMI
+  greetingRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 15 },
+  myAvatar: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: '#EBEBEB', marginRight: 10 },
+  greetingPill: { backgroundColor: '#F5F5F5', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#EBEBEB' },
+  greetingText: { fontSize: 14, fontWeight: '700', color: '#1A1A1A' },
+
+  // BAŞLIK VE İKONLAR
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', paddingHorizontal: 20, paddingBottom: 20 },
+  titleWrapper: { flexDirection: 'column' },
+  mainTitle: { fontSize: 22, fontWeight: '800', color: '#2C3E50', letterSpacing: 0.5 },
+  titleUnderline: { width: '100%', height: 3, backgroundColor: '#1A1A1A', marginTop: 4, borderRadius: 2 },
   
-  // Üst Başlık
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 50, paddingBottom: 15, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#EEEEEE' },
-  title: { fontSize: 17, fontWeight: '900', color: '#2C3E50', letterSpacing: 0.5 },
-  searchButton: { padding: 5 },
+  headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  topIconBtn: { padding: 4 },
 
-  feedContainer: { paddingBottom: 20 },
-
-  // Gönderi Kartı
-  postContainer: { backgroundColor: '#FFFFFF', marginBottom: 15, borderBottomWidth: 1, borderBottomColor: '#EEEEEE' },
+  // GÖNDERİ (FEED) STİLLERİ
+  feedContainer: { paddingHorizontal: 15, paddingBottom: 100 },
+  postContainer: { marginBottom: 30 },
   
-  // Avatar ve İsim
-  postHeader: { flexDirection: 'row', alignItems: 'center', padding: 12 },
-  avatar: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: '#EEEEEE' },
-  username: { flex: 1, marginLeft: 10, fontSize: 14, fontWeight: '700', color: '#2C3E50' },
-  moreOptions: { padding: 5 },
+  imageWrapper: { width: '100%', aspectRatio: 3/4, borderRadius: 20, overflow: 'hidden', backgroundColor: '#F0F0F0', position: 'relative' },
+  postImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+  gradientMask: { position: 'absolute', top: 0, left: 0, right: 0, height: 120 },
 
-  // Fotoğraf
-  postImage: { width: '100%', height: 400, backgroundColor: '#F8F9FA' },
+  postHeaderOverlay: { position: 'absolute', top: 15, left: 15, right: 15, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  postHeaderLeft: { flexDirection: 'row', alignItems: 'center' },
+  postAvatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, borderColor: '#FFFFFF', marginRight: 10 },
+  postUsername: { fontSize: 15, fontWeight: '800', color: '#FFFFFF', textShadowColor: 'rgba(0, 0, 0, 0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  postSubtitle: { fontSize: 12, fontWeight: '500', color: '#E0E0E0', marginTop: 2 },
+  
+  followButton: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5, borderColor: '#FFFFFF', backgroundColor: 'rgba(0,0,0,0.3)' },
+  followButtonText: { fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
 
-  // Beğeni/Yorum Çubuğu
-  interactionBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10 },
-  leftActions: { flexDirection: 'row', alignItems: 'center' },
-  actionIcon: { marginRight: 15 },
-
-  // Alt Kısım (Beğeni sayısı ve yazı)
-  postFooter: { paddingHorizontal: 15, paddingBottom: 15 },
-  likesText: { fontWeight: 'bold', color: '#2C3E50', marginBottom: 5 },
-  captionUsername: { fontWeight: 'bold', color: '#2C3E50' },
-  captionText: { color: '#34495E', lineHeight: 20 },
+  // ETKİLEŞİM ÇUBUĞU
+  actionBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, paddingHorizontal: 5 },
+  actionLeft: { flexDirection: 'row', alignItems: 'center', gap: 15 },
+  actionRight: { flexDirection: 'row', alignItems: 'center', gap: 15 },
+  actionIcon: { padding: 4 },
+  likesText: { fontSize: 14, fontWeight: '800', color: '#1A1A1A', marginLeft: 6 },
 });
