@@ -23,7 +23,8 @@ const CATEGORIES = [
   { id: 'ACCESSORIES', label: 'Accessories', icon: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=100' },
 ];
 
-const AnimatedInsiderButton = () => {
+// Butona tıklama özelliği (onPress)
+  const AnimatedInsiderButton = ({ onPress}: {onPress: () => void }) => {
   const spinValue = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const animation = Animated.loop(
@@ -34,7 +35,8 @@ const AnimatedInsiderButton = () => {
   }, []);
   const spin = spinValue.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
   return (
-    <TouchableOpacity activeOpacity={0.8} style={styles.insiderWrapper}>
+    // onPress tetikleyicisi TouchableOpacity'e bağlandı
+    <TouchableOpacity activeOpacity={0.8} style={styles.insiderWrapper} onPress={onPress}>
       <Animated.View style={[styles.rotatingGradient, { transform: [{ rotate: spin }] }]}>
         <LinearGradient colors={['#FF007F', '#7F00FF', '#00FFFF', '#00FF00', '#FFFF00', '#FF007F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
       </Animated.View>
@@ -354,7 +356,8 @@ export default function WardrobeScreen({ navigation }: any) {
 
       <View style={styles.insiderRow}>
         <MaterialCommunityIcons name="wave" size={30} color="#1A1A1A" style={{ transform: [{ scaleX: -1 }] }} />
-        <AnimatedInsiderButton />
+        {/* 🚀 YENİ: Insider butonuna navigation eklendi */}
+        <AnimatedInsiderButton onPress={()=> navigation.navigate('Shop')} />
         <MaterialCommunityIcons name="wave" size={30} color="#1A1A1A" />
       </View>
 

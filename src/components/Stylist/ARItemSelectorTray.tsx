@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Alert, Dimensions } from 'react-native';
 import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
+import PremiumAlert from '../PremiumAlert';
 
 const { width } = Dimensions.get('window');
 
@@ -14,6 +15,7 @@ export default function ARItemSelectorTray({ allWardrobe, allOutfits = [], setSe
   const [activeTab, setActiveTab] = useState<'Shop' | 'Clothes' | 'Outfits'>('Clothes'); 
   const [selectedIds, setSelectedIds] = useState<string[]>([]); 
   const [selectedOutfitId, setSelectedOutfitId] = useState<string | null>(null);
+  const [shopAlertVisible, setShopAlertVisible] = useState(false);
 
   const toggleItemSelection = (item: any) => {
     setSelectedOutfitId(null); 
@@ -48,17 +50,26 @@ export default function ARItemSelectorTray({ allWardrobe, allOutfits = [], setSe
     setSelectedItems(outfit.items);
   };
 
+  // 🚀 DÜZELTİLDİ: Sadece Premium Modal'ı açar, sekmeyi değiştirmez!
   const handleShopClick = () => {
-    setActiveTab('Shop');
-    Alert.alert(
-      "Shop Feature",
-      "We are working on this. We will keep you informed soon.",
-      [{ text: "OK", onPress: () => setActiveTab('Clothes') }] 
-    );
+    setShopAlertVisible(true);
   };
 
   return (
     <View style={styles.trayContainer}>
+
+        {/* 🚀 PREMIUM MAĞAZA UYARISI (En tepeye alındı ki tüm tepsiyi kaplasın) */}
+      <PremiumAlert
+        visible={shopAlertVisible}
+        title="The Store Is Coming Soon.!"
+        message="The store integration, which will allow you to purchase these amazing pieces you've tried and loved with a single click, will be active very soon."
+        onCancel={() => setShopAlertVisible(false)}
+        onConfirm={() => setShopAlertVisible(false)}
+        confirmText="Got it"
+        cancelText="Close"
+        iconName="shopping-bag"
+      />
+
       <View style={styles.tabBarContainer}>
         {['Shop', 'Clothes', 'Outfits'].map((tab) => (
           <TouchableOpacity 
