@@ -109,7 +109,7 @@ export default function ARTryOnTab({ allWardrobe, allOutfits = [] }: ARTryOnTabP
 
   // 🚀 AKILLI POLLING (SMART POLLING) MANTIĞI  -> Akıllıca client - server ilişkisini kontrol eder.
   const checkVtonResult = async (taskId: string, attempt: number = 1) => {
-    if (attempt > 5) {
+    if (attempt > 10) {
       setBannerStatus('hidden'); 
       alert("Timeout: The process is taking too long. Please try again later.");
       return;
@@ -171,37 +171,59 @@ export default function ARTryOnTab({ allWardrobe, allOutfits = [] }: ARTryOnTabP
 
 
     // 🚀 DRESS UP BUTONUNA BASILINCA ÇALIŞACAK FONKSİYON
-    const handleDressUp = async () => {
-        // 🚀 PANELİ AÇ VE ÇUBUĞU DOLDURMAYA BAŞLA
+const handleDressUp = async () => {
         setBannerStatus('loading');
         progressAnim.setValue(0);
-        Animated.timing(progressAnim, {
-          toValue: 90, // Yavaşça %90'a kadar dolsun
-          duration: 12000, 
-          useNativeDriver: false, // Genişlik (width) animasyonlarında false olmalıdır
-        }).start();
+        Animated.timing(progressAnim, { toValue: 90, duration: 12000, useNativeDriver: false }).start();
         
-        const requestPayload = {
-          userId: CURRENT_USER_ID, 
-          personUrl: userPhoto, 
-          garmentUrls: selectedItems.map(item => item.uri), 
-          tuckedIn: false 
-        };
-
         try {
-          const response = await apiClient.post('/vton/async-try-on', requestPayload);
-          if (response.status === 202) {
-            const taskId = response.data.taskId || response.data;
-            checkVtonResult(taskId, 1); 
-          } else {
-            setBannerStatus('hidden');
-            alert("Warning: Unexpected status code from server.");
-          }
+            // 🚀 AŞAMA 1: KULLANICININ FOTOĞRAFINI CLOUDINARY'E YÜKLE
+            console.log("1. Aşama: Kullanıcı fotoğrafı Cloudinary'ye yükleniyor...");
+            
+            const formData = new FormData();
+            formData.append('image', {
+                uri: userPhoto,
+                name: 'person_tryon.jpg',
+                type: 'image/jpeg'
+            } as any);
+
+            const uploadResponse = await apiClient.post('/vton/upload-person', formData, {
+                headers: { 
+                  'Content-Type': 'multipart/form-data',
+                  'Accept': 'application/json' 
+                }
+            });
+
+            const publicPersonUrl = uploadResponse.data.url;
+            console.log("✅ Fotoğraf yüklendi! URL:", publicPersonUrl);
+
+            // 🚀 AŞAMA 2: JSON PAKETİNİ HAZIRLA VE FAL.AI (RABBITMQ) KUYRUĞUNA AT
+            // Kıyafetler zaten Wardrobe'dan Cloudinary linki (imageUrl) olarak geliyor!
+            // 🚀 DÜZELTME 2: imageUrl yoksa uri'ye bak, o da yoksa url'ye bak! Güvence altına aldık.
+            const garmentUrls = selectedItems.map(item => item.imageUrl || item.uri || item.url);
+
+            const requestPayload = {
+                userId: CURRENT_USER_ID, 
+                personUrl: publicPersonUrl,     // Az önce Cloudinary'den aldığımız gerçek link!
+                garmentUrls: garmentUrls,       // Wardrobe'daki gerçek kıyafet linkleri!
+                tuckedIn: false 
+            };
+
+            console.log("2. Aşama: VTON İşlemi kuyruğa gönderiliyor...", requestPayload);
+            const response = await apiClient.post('/vton/async-try-on', requestPayload);
+
+            if (response.status === 202 || response.status === 200) {
+                const taskId = response.data.taskId;
+                // 🚀 Akıllı Polling'i Başlat
+                checkVtonResult(taskId, 1);
+            }
+            
         } catch (error) {
-          setBannerStatus('hidden'); 
-          alert("Failed to connect to the backend.");
+            console.error("🚨 VTON Başlatma Hatası:", error);
+            setBannerStatus('error');
+            alert("İşlem başlatılamadı. Lütfen internet bağlantınızı kontrol edin.");
         }
-      };
+    };
 
   return (
     <View style={styles.container}>
