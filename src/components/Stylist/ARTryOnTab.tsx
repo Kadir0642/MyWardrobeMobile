@@ -108,8 +108,10 @@ export default function ARTryOnTab({ allWardrobe, allOutfits = [] }: ARTryOnTabP
   }
 
   // 🚀 AKILLI POLLING (SMART POLLING) MANTIĞI  -> Akıllıca client - server ilişkisini kontrol eder.
-  const checkVtonResult = async (taskId: string, attempt: number = 1) => {
-    if (attempt > 10) {
+  // 🚀 1. GÜNCELLEME: Fonksiyona gerçek Cloudinary linkini taşımak için personCloudinaryUrl parametresi ekledik
+  const checkVtonResult = async (taskId: string, attempt: number = 1, personCloudinaryUrl: string) => {
+    // 🚀 2. GÜNCELLEME: AI bazen geç uyanabilir, sabır limitini 10'dan 20'ye çıkardık!
+    if (attempt > 20) {
       setBannerStatus('hidden'); 
       alert("Timeout: The process is taking too long. Please try again later.");
       return;
@@ -125,6 +127,13 @@ export default function ARTryOnTab({ allWardrobe, allOutfits = [] }: ARTryOnTabP
         if (response.data && response.data.status === 'COMPLETED') {
           // İŞLEM BİTTİ! Dönen AI görselini ekranda göster
           console.log("🔥 AI GİYDİRME BAŞARILI:", response.data.resultImageUrl);
+
+          // 🚀 3. GÜNCELLEME: Python "HATA" döndürdüyse uygulamayı çökertme, kullanıcıyı uyar!
+          if (response.data.resultImageUrl === 'HATA') {
+             setBannerStatus('hidden');
+             alert("Giydirme işlemi sırasında yapay zeka bir hata ile karşılaştı. Lütfen daha net bir fotoğraf veya farklı bir kıyafet ile tekrar deneyin.");
+             return; // İşlemi burada kes
+          }
 
           // 🚀 FINOPS 1: SIFIR MALİYETLİ WEBP SIKIŞTIRMA!
           // Eğer dönen sonuç Cloudinary linki ise, anında WebP ve Otomatik Kalite optimizasyonu uygula
@@ -170,13 +179,15 @@ export default function ARTryOnTab({ allWardrobe, allOutfits = [] }: ARTryOnTabP
                 // publicPersonUrl değişkenine erişebilmek için checkVtonResult'a parametre olarak geçebilirsin 
                 // veya componenti state üzerinden okutabilirsin.
                 // Eğer publicPersonUrl scope dışındaysa, geçici olarak kaydettiğimiz state'i (userPhoto) kullanabiliriz:
+
+                //🚀 4. GÜNCELLEME: Artık telefonu galerisindeki veriyi değil, gerçek Cloudinary linkini siliyoruz!
                 // 🚀 DÜZELTME 1: TypeScript'i rahatlatmak için if kontrolü ekledik
-                if (userPhoto) {
-                    await apiClient.delete(`/vton/cleanup-image?imageUrl=${encodeURIComponent(userPhoto)}`);
+                if (personCloudinaryUrl) {
+                    await apiClient.delete(`/vton/cleanup-image?imageUrl=${encodeURIComponent(personCloudinaryUrl)}`);
                     console.log("🗑️ Cloudinary temizliği başarılı! Çöp veri bırakılmadı.");
                 }
             } catch (err) {
-                console.log("Silme işlemi atlandı/başarısız oldu, akış devam ediyor.");
+                console.log("Silme işlemi atlandı/başarısız oldu.");
             }
 
               // 🚀 4. Kullanıcı görsün diye 2.5 saniye bekle, sonra paneli gizle
@@ -186,10 +197,11 @@ export default function ARTryOnTab({ allWardrobe, allOutfits = [] }: ARTryOnTabP
             });
 
           } else {
-            checkVtonResult(taskId, attempt + 1);
+            // Hala PENDING (Bekliyor), personCloudinaryUrl'yi bir sonraki döngüye de taşı
+            checkVtonResult(taskId, attempt + 1, personCloudinaryUrl);
           }
         } catch (error) {
-          checkVtonResult(taskId, attempt + 1);
+          checkVtonResult(taskId, attempt + 1, personCloudinaryUrl);
         }
       }, waitTime);
     };
@@ -237,10 +249,11 @@ const handleDressUp = async () => {
             console.log("2. Aşama: VTON İşlemi kuyruğa gönderiliyor...", requestPayload);
             const response = await apiClient.post('/vton/async-try-on', requestPayload);
 
+            // 🚀 5. GÜNCELLEME: Cloudinary'den dönen gerçek publicPersonUrl'i fonksiyona yolluyoruz
             if (response.status === 202 || response.status === 200) {
                 const taskId = response.data.taskId;
                 // 🚀 Akıllı Polling'i Başlat
-                checkVtonResult(taskId, 1);
+                checkVtonResult(taskId, 1, publicPersonUrl);
             }
             
         } catch (error) {
