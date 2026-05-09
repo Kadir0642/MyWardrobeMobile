@@ -131,7 +131,13 @@ export default function ARTryOnTab({ allWardrobe, allOutfits = [] }: ARTryOnTabP
           // 🚀 3. GÜNCELLEME: Python "HATA" döndürdüyse uygulamayı çökertme, kullanıcıyı uyar!
           if (response.data.resultImageUrl === 'HATA') {
              setBannerStatus('hidden');
-             alert("Giydirme işlemi sırasında yapay zeka bir hata ile karşılaştı. Lütfen daha net bir fotoğraf veya farklı bir kıyafet ile tekrar deneyin.");
+             alert("Giydirme işlemi yapılamadı. Lütfen kollarınızın açık olduğu ve üzerinizde kalın kıyafetlerin olmadığı daha net bir fotoğraf seçin.");
+             
+             // Hata durumunda da ilk resmi SİL!
+             if (personCloudinaryUrl) {
+                 apiClient.delete(`/vton/cleanup-image?imageUrl=${encodeURIComponent(personCloudinaryUrl)}`).catch(()=>console.log("Hata silmesi atlandı"));
+             }
+             
              return; // İşlemi burada kes
           }
 
