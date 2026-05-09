@@ -15,10 +15,10 @@ const CURRENT_USER_ID = 1;
 
 const CATEGORIES = [
   { id: 'ALL', label: 'All', icon: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=100' },
+  { id: 'FULL BODY', label: 'Full Body', icon: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=100' },
   { id: 'OUTERWEAR', label: 'Outerwear', icon: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=100' },
   { id: 'TOPS', label: 'Tops', icon: 'https://images.unsplash.com/photo-1554568218-0f1715e72254?w=100' },
   { id: 'BOTTOMS', label: 'Bottoms', icon: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=100' },
-  { id: 'FULL BODY', label: 'Full Body', icon: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=100' },
   { id: 'FOOTWEAR', label: 'Footwear', icon: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=100' },
   { id: 'ACCESSORIES', label: 'Accessories', icon: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=100' },
 ];
