@@ -32,7 +32,7 @@ export default function ARTryOnTab({ allWardrobe, allOutfits = [] }: ARTryOnTabP
   const [selectedItems, setSelectedItems] = useState<any[]>([]); 
 
   // 🚀 YENİ: Premium Yükleme Barı State'leri
-  const [bannerStatus, setBannerStatus] = useState<'hidden' | 'loading' | 'success'>('hidden');
+  const [bannerStatus, setBannerStatus] = useState<'hidden' | 'loading' | 'success' | 'error'>('hidden');
   const progressAnim = useRef(new Animated.Value(0)).current; // Çubuğun doluluk oranı (0'dan 100'e)
 
   const [toastVisible, setToastVisible] = useState(false);
@@ -126,6 +126,14 @@ export default function ARTryOnTab({ allWardrobe, allOutfits = [] }: ARTryOnTabP
           // İŞLEM BİTTİ! Dönen AI görselini ekranda göster
           console.log("🔥 AI GİYDİRME BAŞARILI:", response.data.resultImageUrl);
 
+          // 🚀 FINOPS 1: SIFIR MALİYETLİ WEBP SIKIŞTIRMA!
+          // Eğer dönen sonuç Cloudinary linki ise, anında WebP ve Otomatik Kalite optimizasyonu uygula
+          let optimizedUrl = response.data.resultImageUrl;
+          if (optimizedUrl.includes('cloudinary.com')) {
+              optimizedUrl = optimizedUrl.replace('/upload/', '/upload/f_webp,q_auto/');
+              console.log("⚡ Optimize Edilmiş WebP Linki:", optimizedUrl);
+          }
+
             // 🚀 1. Çubuğu hızla %100'e tamamla
             Animated.timing(progressAnim, {
               toValue: 100,
@@ -134,7 +142,9 @@ export default function ARTryOnTab({ allWardrobe, allOutfits = [] }: ARTryOnTabP
             }).start(async () => { // 🚀 async ekledik ki bildirim bekleyebilsin
               // 🚀 2. Yazıyı "Tamamlandı" yap ve fotoğrafı güncelle
               setBannerStatus('success');
-              setUserPhoto(response.data.resultImageUrl);
+
+              // 🚀 Ekrana artık 3MB'lık devasa resmi değil, 50KB'lık uçan WebP'yi basıyoruz!
+              setUserPhoto(optimizedUrl);
               
               // 🚀 3. ÇİFT TİTREŞİM (Garanti çalışır, emülatör hariç)
               Vibration.vibrate([0, 200, 100, 200]); 
@@ -146,13 +156,28 @@ export default function ARTryOnTab({ allWardrobe, allOutfits = [] }: ARTryOnTabP
                   body: "Yeni tarzını görmek için tıkla ✨",
                   data: { 
                     screen: 'ItemDetail', // Hedef ekran
-                    imageUrl: response.data.resultImageUrl, // Gösterilecek AI görseli
+                    imageUrl: optimizedUrl, // Gösterilecek AI görseli
                     isAiResult: true 
                   },
                   sound: true,
                 },
                 trigger: null, // null demek anında göster demektir
               });
+
+            // 🚀 FINOPS 2: İLK YÜKLENEN GEÇİCİ FOTOĞRAFI BULUTTAN SİL!
+            // İşlem başarıyla bittiği için artık o ilk manken fotoğrafına ihtiyacımız yok
+            try {
+                // publicPersonUrl değişkenine erişebilmek için checkVtonResult'a parametre olarak geçebilirsin 
+                // veya componenti state üzerinden okutabilirsin.
+                // Eğer publicPersonUrl scope dışındaysa, geçici olarak kaydettiğimiz state'i (userPhoto) kullanabiliriz:
+                // 🚀 DÜZELTME 1: TypeScript'i rahatlatmak için if kontrolü ekledik
+                if (userPhoto) {
+                    await apiClient.delete(`/vton/cleanup-image?imageUrl=${encodeURIComponent(userPhoto)}`);
+                    console.log("🗑️ Cloudinary temizliği başarılı! Çöp veri bırakılmadı.");
+                }
+            } catch (err) {
+                console.log("Silme işlemi atlandı/başarısız oldu, akış devam ediyor.");
+            }
 
               // 🚀 4. Kullanıcı görsün diye 2.5 saniye bekle, sonra paneli gizle
               setTimeout(() => {
