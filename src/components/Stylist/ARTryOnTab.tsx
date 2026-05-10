@@ -40,6 +40,31 @@ export default function ARTryOnTab({ allWardrobe, allOutfits = [] }: ARTryOnTabP
   // 🚀 YENİ: Tam Ekran Görsel Önizleme State'i
   const [previewVisible, setPreviewVisible] = useState(false);
 
+  // 🚀 AR GÖRSELİNİ PORTFOLYOYA KAYDETME
+  const handleSaveToPortfolio = async () => {
+      // userPhoto şu an ekrandaki AR WebP görselini tutuyor
+      if (!userPhoto || selectedItems.length === 0) return;
+
+      try {
+          const requestPayload = {
+              userId: CURRENT_USER_ID,
+              name: "My AR Look " + new Date().toLocaleDateString(), // Otomatik isim
+              outfitImageUrl: userPhoto, 
+              clothingItemIds: selectedItems.map(item => item.id) // Kıyafetlerin veritabanı ID'leri
+          };
+
+          const response = await apiClient.post('/outfits/save-ar-look', requestPayload);
+          
+          if(response.status === 200) {
+              setToastVisible(true); // Ekranda "Başarıyla Kaydedildi" balonu çıksın
+              setPreviewVisible(false); // Modalı kapat
+          }
+      } catch (error) {
+          alert("Kaydedilirken bir hata oluştu.");
+          console.error("Save Look Error:", error);
+      }
+  };
+
   // 3 KADEMELİ TEPSİ MATEMATİĞİ
   const TRAY_HEIGHT = height * 0.85; 
   const PEEK_Y = TRAY_HEIGHT - 90;   
@@ -315,9 +340,9 @@ const handleDressUp = async () => {
                       
                       {/* 3. Aksiyon Çubuğu (Kaydet ve Paylaş) */}
                       <View style={styles.previewActionBar}>
-                          <TouchableOpacity style={styles.previewIconBtn} onPress={() => alert("Save function placeholder")}>
+                          <TouchableOpacity style={styles.previewIconBtn} onPress={handleSaveToPortfolio}>
                               <Feather name="bookmark" size={22} color="#FFFFFF" />
-                              <Text style={styles.previewBtnText}>Kaydet</Text>
+                              <Text style={styles.previewBtnText}>Portfolyoya Ekle</Text>
                           </TouchableOpacity>
                           
                           <TouchableOpacity style={styles.previewIconBtn} onPress={() => alert("Share function placeholder")}>
