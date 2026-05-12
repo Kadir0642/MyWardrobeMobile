@@ -1,14 +1,15 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Animated, PanResponder, TouchableWithoutFeedback, ActivityIndicator, Vibration,Modal } from 'react-native'; // 🚀 Vibration ve ActivityIndicator eklendi!
+import React, { useState, useRef, useEffect } from 'react'; // 🚀 DÜZELTME: useEffect eklendi!
+import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Animated, PanResponder, TouchableWithoutFeedback, ActivityIndicator, Vibration, Modal } from 'react-native'; 
 import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Notifications from 'expo-notifications'; 
 import ARItemSelectorTray from './ARItemSelectorTray'; 
 import { apiClient } from '../../api/client'; 
 import PremiumToast from '../PremiumToast';
-import { BlurView } from 'expo-blur';
+import { BlurView } from 'expo-blur'
 
-// 2. BİLDİRİM DAVRANIŞINI AYARLA (Uygulama açıkken de yukarıdan düşmesini sağlar)
+
+// BİLDİRİM DAVRANIŞINI AYARLA (Uygulama açıkken de yukarıdan düşmesini sağlar)
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true, // 🚀 Eskiden shouldShowAlert idi, artık Banner kullanıyoruz
@@ -21,26 +22,51 @@ Notifications.setNotificationHandler({
 const { width, height } = Dimensions.get('window');
 const CURRENT_USER_ID = "1";
 
+// Navigasyon parametre tipi
+type ARTryOnRouteParams = {
+  preselectedClothes?: any[];
+};
+
+// Props interface'ini route parametresini kabul edecek şekilde güncelle
 interface ARTryOnTabProps {
   allWardrobe: any[];
-  allOutfits?: any[];  // Kombinlerin gelmesi için prop eklendi
+  allOutfits?: any[]; // Kombinlerin gelmesi için prop eklendi
+  route?: { params?: ARTryOnRouteParams }; // 🚀 React Navigation route propu
 }
 
 
-export default function ARTryOnTab({ allWardrobe, allOutfits = [] }: ARTryOnTabProps) {
+export default function ARTryOnTab({ allWardrobe, allOutfits = [], route }: ARTryOnTabProps) {
+
   const [userPhoto, setUserPhoto] = useState<string | null>(null);
   const [selectedItems, setSelectedItems] = useState<any[]>([]); 
+  const [aiGeneratedUrl, setAiGeneratedUrl] = useState<string | null>(null);
 
   // 🚀 YENİ: Premium Yükleme Barı State'leri
   const [bannerStatus, setBannerStatus] = useState<'hidden' | 'loading' | 'success' | 'error'>('hidden');
   const progressAnim = useRef(new Animated.Value(0)).current; // Çubuğun doluluk oranı (0'dan 100'e)
-
   const [toastVisible, setToastVisible] = useState(false);
-
+  
   // 🚀 YENİ: Tam Ekran Görsel Önizleme State'i
   const [previewVisible, setPreviewVisible] = useState(false);
 
-  // 🚀 AR GÖRSELİNİ PORTFOLYOYA KAYDETME
+  //  Gardıroptan gelen kıyafetleri otomatik seç
+  useEffect(() => {
+    // 1. Eğer navigasyondan 'preselectedClothes' parametresi geldiyse
+    const preselected = route?.params?.preselectedClothes;
+    
+    if (preselected && Array.isArray(preselected) && preselected.length > 0) {
+      console.log(`👗 Kombinden ${preselected.length} parça tepsiye otomatik diziliyor...`);
+      
+      // 2. React Native'in selectedItems state'ini bu kıyafetlerle doldur
+      // selectedItemsBar anında güncellenecek!
+      setSelectedItems(preselected);
+      
+      // 3. UX: Kullanıcıyı uyarmak için hafifçe titretelim
+      Vibration.vibrate(100); 
+    }
+  }, [route?.params?.preselectedClothes]); // Sadece bu parametre değişirse çalıştır
+
+  //  AR GÖRSELİNİ PORTFOLYOYA KAYDETME
   const handleSaveToPortfolio = async () => {
       // userPhoto şu an ekrandaki AR WebP görselini tutuyor
       if (!userPhoto || selectedItems.length === 0) return;
@@ -49,7 +75,7 @@ export default function ARTryOnTab({ allWardrobe, allOutfits = [] }: ARTryOnTabP
           const requestPayload = {
               userId: CURRENT_USER_ID,
               name: "My AR Look " + new Date().toLocaleDateString(), // Otomatik isim
-              outfitImageUrl: userPhoto, 
+              outfitImageUrl: aiGeneratedUrl || userPhoto,  // // 🚀 DÜZELTME: Artık local userPhoto değil, AI'dan gelen linki yolluyoruz!
               clothingItemIds: selectedItems.map(item => item.id) // Kıyafetlerin veritabanı ID'leri
           };
 
@@ -63,7 +89,6 @@ export default function ARTryOnTab({ allWardrobe, allOutfits = [] }: ARTryOnTabP
           alert("Kaydedilirken bir hata oluştu.");
           console.error("Save Look Error:", error);
       }
-  };
 
   // 3 KADEMELİ TEPSİ MATEMATİĞİ
   const TRAY_HEIGHT = height * 0.85; 
@@ -185,6 +210,9 @@ export default function ARTryOnTab({ allWardrobe, allOutfits = [] }: ARTryOnTabP
 
               // 🚀 Ekrana artık 3MB'lık devasa resmi değil, 50KB'lık uçan WebP'yi basıyoruz!
               setUserPhoto(optimizedUrl);
+
+              // 🚀 EKLENEN SATIR: AI'dan gelen gerçek linki hafızaya alıyoruz
+            setAiGeneratedUrl(optimizedUrl);
               
               // 🚀 3. ÇİFT TİTREŞİM (Garanti çalışır, emülatör hariç)
               Vibration.vibrate([0, 200, 100, 200]); 
@@ -389,7 +417,7 @@ const handleDressUp = async () => {
               <View style={styles.selectedItemsScroll}>
                 {selectedItems.slice(0, 4).map((item, index) => (
                   <View key={index} style={styles.selectedItemBubble}>
-                    <Image source={{ uri: item.uri }} style={styles.selectedItemImg} />
+                    <Image source={{ uri: item.imageUrl || item.uri }} style={styles.selectedItemImg} />
                   </View>
                 ))}
                 {selectedItems.length > 4 && (
@@ -560,5 +588,5 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
     letterSpacing: 0.5,
-  },
+  }
 });

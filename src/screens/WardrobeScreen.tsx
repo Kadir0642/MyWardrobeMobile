@@ -1,149 +1,58 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Animated, Easing, Dimensions, FlatList, ScrollView, Alert, RefreshControl, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Animated, Dimensions, Alert } from 'react-native';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useProfile } from '../context/ProfileContext';
 import * as ImagePicker from 'expo-image-picker';
-import { useFocusEffect } from '@react-navigation/native';
+import ViewToggle from '../components/wardrobe/ViewToggle'; 
 
+// 🚀 İMPORTLARIMIZ
+import { useProfile } from '../context/ProfileContext';
 import { apiClient } from '../api/client';
-import { ClothingItem } from '../types';
+import { useWardrobeItems } from '../hooks/useWardrobeItems';
+import { useOutfits } from '../hooks/useOutfits';
+
+// 🚀 BİLEŞENLER VE EKRANLAR
+import CategorySelector from '../components/wardrobe/CategorySelector';
+import AnimatedInsiderButton from '../components/wardrobe/AnimatedInsiderButton';
+import ItemsTabView from './wardrobe/ItemsTabView';
+import OutfitsTabView from './wardrobe/OutfitsTabView';
 
 const { width } = Dimensions.get('window');
-const CURRENT_USER_ID = 1; 
-
-const CATEGORIES = [
-  { id: 'ALL', label: 'All', icon: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=100' },
-  { id: 'FULL BODY', label: 'Full Body', icon: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=100' },
-  { id: 'OUTERWEAR', label: 'Outerwear', icon: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=100' },
-  { id: 'TOPS', label: 'Tops', icon: 'https://images.unsplash.com/photo-1554568218-0f1715e72254?w=100' },
-  { id: 'BOTTOMS', label: 'Bottoms', icon: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=100' },
-  { id: 'FOOTWEAR', label: 'Footwear', icon: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=100' },
-  { id: 'ACCESSORIES', label: 'Accessories', icon: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=100' },
-];
-
-// Butona tıklama özelliği (onPress)
-  const AnimatedInsiderButton = ({ onPress}: {onPress: () => void }) => {
-  const spinValue = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const animation = Animated.loop(
-      Animated.timing(spinValue, { toValue: 1, duration: 3000, easing: Easing.linear, useNativeDriver: true })
-    );
-    animation.start();
-    return () => animation.stop(); 
-  }, []);
-  const spin = spinValue.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
-  return (
-    // onPress tetikleyicisi TouchableOpacity'e bağlandı
-    <TouchableOpacity activeOpacity={0.8} style={styles.insiderWrapper} onPress={onPress}>
-      <Animated.View style={[styles.rotatingGradient, { transform: [{ rotate: spin }] }]}>
-        <LinearGradient colors={['#FF007F', '#7F00FF', '#00FFFF', '#00FF00', '#FFFF00', '#FF007F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
-      </Animated.View>
-      <View style={styles.insiderInner}><Text style={styles.insiderText}>Insider</Text></View>
-    </TouchableOpacity>
-  );
-};
 
 export default function WardrobeScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
-  const { profileImage } = useProfile();
   
-  const [mainTab, setMainTab] = useState<'ITEMS' | 'OUTFITS'>('ITEMS');
+  // 🚀 YENİ STATE: Görünüm Modu
+  const [outfitViewMode, setOutfitViewMode] = useState<'PIECES' | 'LOOKS'>('PIECES');
+
+  // 🚀 1. GLOBAL USER ID
+  const { profileImage, currentUserId } = useProfile();
+  
+  // 🚀 2. CUSTOM HOOKLAR 
+  const { items, totalCount: itemsCount, isLoadingMore, fetchWardrobe, loadMoreItems } = useWardrobeItems(currentUserId);
+  const { outfits, totalCount: outfitsCount, isLoadingMore: isLoadingOutfits, fetchOutfits, loadMoreOutfits } = useOutfits(currentUserId);
+
+  // 🚀 3. UI STATE'LERİ
+  const [mainTab, setMainTab] = useState<'ITEMS' | 'OUTFITS' | 'LOOKBOOKS'>('ITEMS');
   const [activeCategory, setActiveCategory] = useState('ALL');
-  
-  const [masterItems, setMasterItems] = useState<ClothingItem[]>([]); 
-  const [displayItems, setDisplayItems] = useState<ClothingItem[]>([]); 
-  
-  const [outfits, setOutfits] = useState<any[]>([]);
-  const [outfitsCurrentPage, setOutfitsCurrentPage] = useState(0); 
-  const [outfitsTotalPages, setOutfitsTotalPages] = useState(1); 
-  const [totalOutfitsCount, setTotalOutfitsCount] = useState(0); 
-  const [isLoadingMoreOutfits, setIsLoadingMoreOutfits] = useState(false);
-
-  const [currentPage, setCurrentPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItemsCount, setTotalItemsCount] = useState(0); 
-  const [isLoadingMore, setIsLoadingMore] = useState(false); 
-  
-  const [newItemIds, setNewItemIds] = useState<number[]>([]);
-  
-  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'completed'>('idle');
-  const [numColumns, setNumColumns] = useState(2); 
+  const [displayItems, setDisplayItems] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-
+  const [numColumns, setNumColumns] = useState(2);
+  const [newItemIds, setNewItemIds] = useState<number[]>([]);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'completed'>('idle');
+  
   const loadingProgress = useRef(new Animated.Value(0)).current;
 
-  const fetchWardrobe = async (page = 0, isRefresh = false) => {
-    if (isLoadingMore) return; 
-    try {
-      if (page > 0) setIsLoadingMore(true);
-
-      const response = await apiClient.get(`/clothes/${CURRENT_USER_ID}?page=${page}&size=20&sort=id,desc`);
-      const responseData = response.data;
-      const itemsArray: ClothingItem[] = responseData.content ? responseData.content : (Array.isArray(responseData) ? responseData : []);
-
-      const totalElements = responseData.totalElements || itemsArray.length;
-      const totalPagesFromApi = responseData.totalPages || 1;
-
-      setTotalItemsCount(totalElements);
-      setTotalPages(totalPagesFromApi);
-
-      if (isRefresh || page === 0) {
-        setMasterItems(itemsArray); 
-      } else {
-        setMasterItems(prev => [...prev, ...itemsArray]); 
-      }
-      
-      setCurrentPage(page);
-      return itemsArray; 
-
-    } catch (error: any) {
-      console.error("🚨 Dolap verisi çekme hatası: ", error.response?.data || error.message);
-    } finally {
-      setIsLoadingMore(false);
+  // Filtreleme Mantığı
+  useEffect(() => {
+    if (activeCategory === 'ALL') {
+      setDisplayItems(items);
+    } else {
+      setDisplayItems(items.filter(i => i.category?.toUpperCase() === activeCategory));
     }
-  };
+  }, [activeCategory, items]);
 
-  const fetchOutfits = async (page = 0, isRefresh = false) => {
-    if (isLoadingMoreOutfits) return;
-
-    try {
-      if (page > 0) setIsLoadingMoreOutfits(true);
-
-      const response = await apiClient.get(`/outfits/user/${CURRENT_USER_ID}?page=${page}&size=10&sort=id,desc`);
-      const responseData = response.data;
-      const outfitsArray = responseData.content ? responseData.content : [];
-
-      setTotalOutfitsCount(responseData.totalElements || outfitsArray.length);
-      setOutfitsTotalPages(responseData.totalPages || 1);
-
-      if (isRefresh || page === 0) {
-        setOutfits(outfitsArray); 
-      } else {
-        setOutfits(prev => {
-          const existingIds = new Set(prev.map(item => item.id));
-          const filteredNewItems = outfitsArray.filter((item: any) => !existingIds.has(item.id));
-          return [...prev, ...filteredNewItems];
-        });
-      }
-      
-      setOutfitsCurrentPage(page);
-
-    } catch (error: any) {
-      console.error("🚨 Kombinler çekilemedi: ", error.message);
-    } finally {
-      setIsLoadingMoreOutfits(false);
-    }
-  };
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchWardrobe(0, true);
-      fetchOutfits(); 
-    }, [])
-  );
-
+  // Yenileme Mantığı
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     if (mainTab === 'ITEMS') {
@@ -152,26 +61,15 @@ export default function WardrobeScreen({ navigation }: any) {
       await fetchOutfits(0, true);
     }
     setRefreshing(false);
-  }, [mainTab]);
+  }, [mainTab, fetchWardrobe, fetchOutfits]);
 
-  const loadMoreData = () => {
-    if (mainTab === 'ITEMS' && currentPage < totalPages - 1 && !isLoadingMore) {
-      fetchWardrobe(currentPage + 1, false);
-    } 
-    else if (mainTab === 'OUTFITS' && outfitsCurrentPage < outfitsTotalPages - 1 && !isLoadingMoreOutfits) {
-      fetchOutfits(outfitsCurrentPage + 1, false); 
-    }
-  };
-
+  // Sayfa Yüklendiğinde
   useEffect(() => {
-    if (activeCategory === 'ALL') {
-      setDisplayItems(masterItems);
-    } else {
-      const filtered = masterItems.filter(item => item.category?.toUpperCase() === activeCategory);
-      setDisplayItems(filtered);
-    }
-  }, [activeCategory, masterItems]);
+    fetchWardrobe(0, true);
+    fetchOutfits(0, true);
+  }, [currentUserId]);
 
+  // Animasyon Kontrolü
   useEffect(() => {
     if (uploadStatus === 'uploading') {
       Animated.loop(Animated.sequence([
@@ -187,6 +85,7 @@ export default function WardrobeScreen({ navigation }: any) {
 
   const barWidth = loadingProgress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
+  // 🚀 GÖRSEL YÜKLEME VE POLLING MANTIĞI
   const pickAndUploadImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({ 
       mediaTypes: ['images'], 
@@ -199,7 +98,7 @@ export default function WardrobeScreen({ navigation }: any) {
     if (!result.canceled && result.assets.length > 0) {
       setUploadStatus('uploading'); 
       let successCount = 0; 
-      const existingIdsBeforeUpload = new Set(masterItems.map(i => i.id));
+      const existingIdsBeforeUpload = new Set(items.map(i => i.id));
 
       for (let i = 0; i < result.assets.length; i++) {
         const imageUri = result.assets[i].uri;
@@ -207,7 +106,7 @@ export default function WardrobeScreen({ navigation }: any) {
         formData.append('image', { uri: imageUri, name: `wardrobe_item_${i}.jpg`, type: 'image/jpeg' } as any);
 
         try {
-          const extractResponse = await apiClient.post(`/clothes/${CURRENT_USER_ID}/ai-extract`, formData, {
+          const extractResponse = await apiClient.post(`/clothes/${currentUserId}/ai-extract`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
           });
 
@@ -217,7 +116,7 @@ export default function WardrobeScreen({ navigation }: any) {
             
             while (!isDone) {
               await new Promise(resolve => setTimeout(resolve, 3000));
-              const statusResponse = await apiClient.get(`/clothes/${CURRENT_USER_ID}/ai-status/${taskId}`);
+              const statusResponse = await apiClient.get(`/clothes/${currentUserId}/ai-status/${taskId}`);
               const statusData = statusResponse.data;
 
               if (statusData.status === 'COMPLETED') {
@@ -237,8 +136,8 @@ export default function WardrobeScreen({ navigation }: any) {
         const freshItems = await fetchWardrobe(0, true); 
         if (freshItems) {
           const newlyAddedIds = freshItems
-            .filter((item: ClothingItem) => !existingIdsBeforeUpload.has(item.id))
-            .map((item: ClothingItem) => item.id);
+            .filter((item: any) => !existingIdsBeforeUpload.has(item.id))
+            .map((item: any) => item.id);
             
           if (newlyAddedIds.length > 0) {
             setNewItemIds(prev => [...prev, ...newlyAddedIds]); 
@@ -253,86 +152,10 @@ export default function WardrobeScreen({ navigation }: any) {
     }
   };
 
-  const toggleGrid = () => { setNumColumns(numColumns === 2 ? 3 : 2); };
-  const cardWidth = (width - 2) / numColumns; 
-
-  const handleItemPress = (clickedItem: ClothingItem) => {
-    if (newItemIds.includes(clickedItem.id)) {
-      setNewItemIds(prev => prev.filter(id => id !== clickedItem.id));
-    }
-    navigation.navigate('ItemDetail', { item: clickedItem });
-  };
-
-  const renderItem = ({ item }: { item: ClothingItem }) => {
-    const isNewItem = newItemIds.includes(item.id); 
-    return (
-      <TouchableOpacity 
-        activeOpacity={0.9} 
-        onPress={() => handleItemPress(item)}
-        style={[styles.cardContainer, { width: cardWidth }, isNewItem && styles.newCardBorder]}
-      >
-        <View style={styles.cardImageWrapper}>
-          <Image source={{ uri: item.imageUrl }} style={styles.cardImage} />
-          {isNewItem && (
-            <View style={styles.newBadge}>
-              <Text style={styles.newBadgeText}>NEW</Text>
-            </View>
-          )}
-          <View style={styles.likeContainer}>
-            <Feather name="heart" size={18} color="#1A1A1A" />
-            {item.wearCount > 0 && <Text style={styles.likeText}>{item.wearCount}</Text>}
-          </View>
-        </View>
-        <View style={styles.cardFooter}>
-          <Text style={styles.brandText} numberOfLines={1}>{item.brand || 'AI Item'}</Text> 
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  const renderOutfit = ({ item }: { item: any }) => {
-    const clothesArray = item.clothes || [];
-    const itemsToShow = clothesArray.slice(0, 4);
-    const outfitWidth = (width - (numColumns + 1) * 10) / numColumns; 
-
-    return (
-      <TouchableOpacity 
-        activeOpacity={0.9} 
-        style={[styles.outfitCard, { width: outfitWidth }]} 
-        onPress={() => navigation.navigate('OutfitDetail', { outfit: item })}
-      >
-        <View style={styles.outfitImageGrid}>
-          {itemsToShow.map((outfitItem: any, index: number) => (
-            <View key={index} style={styles.outfitGridCell}>
-               <Image source={{ uri: outfitItem.imageUrl }} style={styles.outfitGridImage} />
-            </View>
-          ))}
-          {clothesArray.length > 4 && (
-            <View style={styles.moreItemsOverlay}>
-              <Text style={[styles.moreItemsText, numColumns === 3 && { fontSize: 12 }]}>
-                +{clothesArray.length - 4}
-              </Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.outfitFooter}>
-          <Text style={[styles.outfitDateText, numColumns === 3 && { fontSize: 10 }]} numberOfLines={1}>
-            {item.name || "Kombinim"}
-          </Text>
-          {numColumns === 2 && (
-            <View style={styles.outfitActionRow}>
-               <MaterialCommunityIcons name="hanger" size={14} color="#888" />
-               <Text style={styles.outfitItemCount}>{clothesArray.length} parça</Text>
-            </View>
-          )}
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       
+      {/* 🚀 ÜST YÜKLEME BANNERI */}
       {uploadStatus !== 'idle' && (
         <View style={[styles.loadingBanner, uploadStatus === 'completed' && { backgroundColor: '#E8F5E9' }]}>
           <Text style={[styles.loadingBannerText, uploadStatus === 'completed' && { color: '#2E7D32' }]}>
@@ -344,6 +167,7 @@ export default function WardrobeScreen({ navigation }: any) {
         </View>
       )}
 
+      {/* 🚀 HEADER */}
       <View style={styles.headerRow}>
         <Image source={profileImage ? { uri: profileImage } : { uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200' }} style={styles.headerProfileImage} />
         <Text style={styles.logoText}>VESTIFY</Text>
@@ -356,119 +180,84 @@ export default function WardrobeScreen({ navigation }: any) {
 
       <View style={styles.insiderRow}>
         <MaterialCommunityIcons name="wave" size={30} color="#1A1A1A" style={{ transform: [{ scaleX: -1 }] }} />
-        {/* 🚀 YENİ: Insider butonuna navigation eklendi */}
-        <AnimatedInsiderButton onPress={()=> navigation.navigate('Shop')} />
+        <AnimatedInsiderButton onPress={() => navigation.navigate('Shop')} />
         <MaterialCommunityIcons name="wave" size={30} color="#1A1A1A" />
       </View>
 
+      {/* 🚀 TAB SEÇİCİ */}
       <View style={styles.tabsRow}>
-        <TouchableOpacity 
-          style={[styles.tabItem, mainTab === 'ITEMS' && styles.tabItemActive]} 
-          onPress={() => setMainTab('ITEMS')}
-        >
+        <TouchableOpacity style={[styles.tabItem, mainTab === 'ITEMS' && styles.tabItemActive]} onPress={() => setMainTab('ITEMS')}>
           <Text style={[styles.tabTitle, mainTab === 'ITEMS' && styles.tabTitleActive]}>ITEMS</Text>
-          <Text style={styles.tabCount}>({totalItemsCount})</Text> 
+          <Text style={styles.tabCount}>({itemsCount})</Text> 
         </TouchableOpacity>
         
-        <TouchableOpacity 
-          style={[styles.tabItem, styles.tabCenterBorder, mainTab === 'OUTFITS' && styles.tabItemActive]}
-          onPress={() => {
-            setMainTab('OUTFITS');
-            fetchOutfits(0, true); 
-          }}
-        >
+        <TouchableOpacity style={[styles.tabItem, styles.tabCenterBorder, mainTab === 'OUTFITS' && styles.tabItemActive]} onPress={() => setMainTab('OUTFITS')}>
           <Text style={[styles.tabTitle, mainTab === 'OUTFITS' && styles.tabTitleActive]}>OUTFITS</Text>
-          <Text style={styles.tabCount}>({totalOutfitsCount})</Text> 
+          <Text style={styles.tabCount}>({outfitsCount})</Text> 
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.tabItem}>
-          <Text style={styles.tabTitle}>LOOKBOOKS</Text>
+        <TouchableOpacity style={[styles.tabItem, mainTab === 'LOOKBOOKS' && styles.tabItemActive]} onPress={() => setMainTab('LOOKBOOKS')}>
+          <Text style={[styles.tabTitle, mainTab === 'LOOKBOOKS' && styles.tabTitleActive]}>LOOKBOOKS</Text>
           <Text style={styles.tabCount}>(0)</Text>
         </TouchableOpacity>
       </View>
 
+      {/* 🚀 İÇERİK ALANI */}
       {mainTab === 'ITEMS' && (
-        <View style={styles.categoriesRow}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesScroll}>
-            {CATEGORIES.map((cat) => (
-              <TouchableOpacity key={cat.id} style={styles.categoryCircleWrapper} onPress={() => setActiveCategory(cat.id)}>
-                <View style={[styles.categoryCircle, activeCategory === cat.id && styles.categoryCircleActive]}>
-                  <Image source={{ uri: cat.icon }} style={styles.categoryIcon} />
-                </View>
-                <Text style={[styles.categoryLabel, activeCategory === cat.id && styles.categoryLabelActive]}>{cat.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-          <View style={styles.filterIconsBox}>
-            <Feather name="heart" size={24} color="#1A1A1A" style={{ marginRight: 15 }} />
-            <Feather name="sliders" size={24} color="#1A1A1A" />
-          </View>
+        <>
+          <CategorySelector activeCategory={activeCategory} onSelectCategory={setActiveCategory} />
+          <ItemsTabView 
+            items={displayItems} 
+            numColumns={numColumns} 
+            isLoadingMore={isLoadingMore}
+            refreshing={refreshing}
+            newItemIds={newItemIds}
+            onRefresh={onRefresh}
+            onEndReached={loadMoreItems}
+            onItemPress={(item) => navigation.navigate('ItemDetail', { item })}
+          />
+        </>
+      )}
+
+      {mainTab === 'OUTFITS' && (
+        <OutfitsTabView 
+          outfits={outfits} 
+          numColumns={numColumns}
+          viewMode={outfitViewMode} 
+          isLoadingMore={isLoadingOutfits}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          onEndReached={loadMoreOutfits}
+          onOutfitPress={(outfit) => navigation.navigate('OutfitDetail', { outfit })}
+          // 🚀 İÇ İÇE (NESTED) NAVİGATÖR DÜZELTMESİ (Kırmızı hatayı giderir)
+          onTryOnNavigate={(clothes) => navigation.navigate('Stylist', { screen: 'ARTryOnTab', params: { preselectedClothes: clothes } })}
+        />
+      )}
+
+      {mainTab === 'LOOKBOOKS' && (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+           <Text style={{ color: '#888', fontSize: 16 }}>Lookbooks çok yakında burada olacak!</Text>
         </View>
       )}
 
-      {mainTab === 'ITEMS' ? (
-        <FlatList
-          key={`items-${numColumns}`} 
-          data={displayItems} 
-          numColumns={numColumns}
-          keyExtractor={(item) => item.id.toString()}
-          initialNumToRender={6}
-          maxToRenderPerBatch={4}
-          windowSize={5} 
-          removeClippedSubviews={true} 
-          renderItem={renderItem}
-          contentContainerStyle={styles.gridContainer}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#E07A5F" />}
-          onEndReached={loadMoreData} 
-          onEndReachedThreshold={0.5}  
-          ListFooterComponent={        
-            isLoadingMore ? (
-              <View style={{ paddingVertical: 20 }}>
-                <ActivityIndicator size="small" color="#E07A5F" />
-              </View>
-            ) : null
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Feather name="inbox" size={48} color="#D1CFC7" />
-              <Text style={styles.emptyText}>Bu kategoride ürün bulunamadı.</Text>
-            </View>
-          }
-        />
-      ) : (
-        <FlatList
-          key={`outfits-${numColumns}`} 
-          data={outfits} 
-          numColumns={numColumns}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={renderOutfit}
-          contentContainerStyle={styles.outfitListContainer}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#E07A5F" />}
-          onEndReached={loadMoreData} 
-          onEndReachedThreshold={0.5} 
-          ListFooterComponent={        
-            isLoadingMoreOutfits ? (
-              <View style={{ paddingVertical: 20 }}>
-                <ActivityIndicator size="small" color="#1A1A1A" />
-              </View>
-            ) : null
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <MaterialCommunityIcons name="hanger" size={56} color="#000000" />
-              <Text style={styles.emptyText}>Henüz bir kombin kaydetmediniz.</Text>
-              <Text style={styles.emptySubText}>AI Suggestions'tan veya Canvas'tan kombin oluşturun!</Text>
-            </View>
-          }
-        />
-      )}
+      {/* 🚀 SAĞ ALT YÜZEN KONTROL GRUBU (Tüm Yüzen Butonlar Burada) */}
+      <View style={styles.floatingControls}>
 
-      <TouchableOpacity style={styles.gridToggleBtn} activeOpacity={0.8} onPress={toggleGrid}>
-        <Feather name={numColumns === 2 ? "grid" : "columns"} size={20} color="#1A1A1A" />
-      </TouchableOpacity>
+              {/* Her iki sekmede de görünen Grid ızgara düğmesi */}
+        {(mainTab === 'ITEMS' || mainTab === 'OUTFITS') && (
+          <TouchableOpacity style={styles.gridToggleBtn} onPress={() => setNumColumns(numColumns === 2 ? 3 : 2)}>
+            <Feather name={numColumns === 2 ? "grid" : "columns"} size={20} color="#1A1A1A" />
+          </TouchableOpacity>
+        )}
+        
+        {/* Sadece OUTFITS sekmesinde görünen görünüm anahtarı */}
+        {mainTab === 'OUTFITS' && (
+          <ViewToggle activeView={outfitViewMode} onViewChange={setOutfitViewMode} />
+        )}
+  
+      </View>
 
+      {/* 🚀 PLUS YÜKLEME BUTONU (Sadece ITEMS Sekmesinde) */}
       {mainTab === 'ITEMS' && (
         <TouchableOpacity style={styles.aiUploadButton} activeOpacity={0.9} onPress={pickAndUploadImage}>
           <Feather name="plus" size={36} color="#E07A5F" />
@@ -490,10 +279,6 @@ const styles = StyleSheet.create({
   logoText: { fontSize: 28, fontWeight: '500', letterSpacing: 2, color: '#1A1A1A' },
   headerIcons: { flexDirection: 'row', alignItems: 'center' },
   insiderRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginVertical: 15, gap: 10 },
-  insiderWrapper: { width: 100, height: 36, justifyContent: 'center', alignItems: 'center', overflow: 'hidden', borderRadius: 18, borderWidth: 1, borderColor: '#DDD' },
-  rotatingGradient: { position: 'absolute', width: 150, height: 150 },
-  insiderInner: { width: 94, height: 30, backgroundColor: '#F5F2EB', justifyContent: 'center', alignItems: 'center', borderRadius: 15 },
-  insiderText: { fontSize: 13, fontWeight: '700', letterSpacing: 1, color: '#1A1A1A' },
   tabsRow: { flexDirection: 'row', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#D1CFC7', backgroundColor: '#F5F2EB' },
   tabItem: { flex: 1, alignItems: 'center', paddingVertical: 10 },
   tabItemActive: { backgroundColor: '#EBE8DF' }, 
@@ -501,40 +286,9 @@ const styles = StyleSheet.create({
   tabTitle: { fontSize: 14, fontWeight: '600', color: '#888' },
   tabTitleActive: { color: '#1A1A1A', fontWeight: '800' }, 
   tabCount: { fontSize: 14, color: '#666', marginTop: 2 },
-  categoriesRow: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: '#D1CFC7', backgroundColor: '#EBE8DF' },
-  categoriesScroll: { paddingVertical: 10, paddingLeft: 10 },
-  categoryCircleWrapper: { alignItems: 'center', marginRight: 15 },
-  categoryCircle: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#DDD', overflow: 'hidden', borderWidth: 2, borderColor: 'transparent' },
-  categoryCircleActive: { borderColor: '#1A1A1A' },
-  categoryIcon: { width: '100%', height: '100%', resizeMode: 'cover', opacity: 0.8 },
-  categoryLabel: { fontSize: 10, fontWeight: '600', color: '#666', marginTop: 4 },
-  categoryLabelActive: { color: '#1A1A1A', fontWeight: '800' },
-  filterIconsBox: { flexDirection: 'row', paddingHorizontal: 15, height: '100%', alignItems: 'center', borderLeftWidth: 1, borderColor: '#D1CFC7', backgroundColor: '#F5F2EB' },
-  gridContainer: { paddingBottom: 100 }, 
-  cardContainer: { margin: 1, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderRightWidth: 1, borderColor: '#D1CFC7' },
-  newCardBorder: { borderColor: '#DFFF00', borderWidth: 2 },
-  newBadge: { position: 'absolute', top: 8, left: 8, backgroundColor: '#DFFF00', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4, zIndex: 10 },
-  newBadgeText: { fontSize: 9, fontWeight: '900', color: '#1A1A1A', letterSpacing: 0.5 },
-  cardImageWrapper: { width: '100%', aspectRatio: 3/4, backgroundColor: '#F9F9F9' },
-  cardImage: { width: '100%', height: '100%', resizeMode: 'contain' },
-  likeContainer: { position: 'absolute', top: 10, right: 10, alignItems: 'center' },
-  likeText: { fontSize: 12, fontWeight: '700', color: '#1A1A1A', marginTop: 2 },
-  cardFooter: { padding: 8, borderTopWidth: 1, borderColor: '#F0F0F0' },
-  brandText: { fontSize: 11, fontWeight: '700', color: '#888', textTransform: 'capitalize' },
-  emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 50 },
-  emptyText: { marginTop: 15, fontSize: 16, fontWeight: '600', color: '#888' },
-  emptySubText: { marginTop: 5, fontSize: 13, color: '#AAA', textAlign: 'center', paddingHorizontal: 20 },
-  gridToggleBtn: { position: 'absolute', bottom: 105, right: 30, width: 44, height: 44, borderRadius: 22, backgroundColor: '#F5F2EB', borderWidth: 1, borderColor: '#D1CFC7', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
-  aiUploadButton: { position: 'absolute', bottom: 30, right: 20, width: 64, height: 64, borderRadius: 32, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#E07A5F', justifyContent: 'center', alignItems: 'center', shadowColor: '#E07A5F', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
-  outfitListContainer: { paddingHorizontal: 5, paddingTop: 10, paddingBottom: 100 },
-  outfitCard: { margin: 5, backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 3 },
-  outfitImageGrid: { flexDirection: 'row', flexWrap: 'wrap', width: '100%', aspectRatio: 1, backgroundColor: '#FAFAFA' },
-  outfitGridCell: { width: '50%', height: '50%', padding: 2, borderWidth: 0.5, borderColor: '#F0F0F0' },
-  outfitGridImage: { width: '100%', height: '100%', resizeMode: 'contain' },
-  moreItemsOverlay: { position: 'absolute', bottom: 2, right: 2, width: '49%', height: '49%', backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
-  moreItemsText: { color: '#FFF', fontSize: 16, fontWeight: '800' },
-  outfitFooter: { padding: 12, borderTopWidth: 1, borderColor: '#F5F5F5' },
-  outfitDateText: { fontSize: 12, fontWeight: '700', color: '#1A1A1A', marginBottom: 4 },
-  outfitActionRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  outfitItemCount: { fontSize: 11, color: '#888', fontWeight: '600' }
+  
+  // 🚀 DÜZELTİLMİŞ VE TEKİLLEŞTİRİLMİŞ YÜZEN KONTROL STİLLERİ
+  floatingControls: { position: 'absolute', bottom: 100, right: 20, alignItems: 'flex-end', gap: 12, zIndex: 100 },
+  gridToggleBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4 },
+  aiUploadButton: { position: 'absolute', bottom: 30, right: 20, width: 64, height: 64, borderRadius: 32, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#E07A5F', justifyContent: 'center', alignItems: 'center', shadowColor: '#E07A5F', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 }
 });

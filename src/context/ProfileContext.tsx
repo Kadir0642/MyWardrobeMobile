@@ -1,9 +1,11 @@
 import React, { createContext, useState, useContext } from 'react';
 
-// Sistemin taşıyacağı verilerin tipleri | npx expo start -c ile çalışıyor.
+// Sistemin taşıyacağı verilerin tipleri
 interface ProfileContextType {
   profileImage: string | null;
   setProfileImage: (uri: string | null) => void;
+  currentUserId: number;
+  setCurrentUserId: (id: number) => void;
 }
 
 // Merkezi depomuzu oluşturuyoruz
@@ -12,9 +14,12 @@ const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
 // Uygulamayı saracak olan Sağlayıcı (Provider) Kapsülümüz
 export const ProfileProvider = ({ children }: { children: React.ReactNode }) => {
   const [profileImage, setProfileImage] = useState<string | null>(null);
+  
+  // 🚀 DÜZELTME BURADA: State'i "boşluktan" alıp Provider'ın içine taşıdık!
+  const [currentUserId, setCurrentUserId] = useState<number>(1); 
 
   return (
-    <ProfileContext.Provider value={{ profileImage, setProfileImage }}>
+    <ProfileContext.Provider value={{ profileImage, setProfileImage, currentUserId, setCurrentUserId }}>
       {children}
     </ProfileContext.Provider>
   );
