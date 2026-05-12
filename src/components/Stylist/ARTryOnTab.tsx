@@ -89,6 +89,7 @@ export default function ARTryOnTab({ allWardrobe, allOutfits = [], route }: ARTr
           alert("Kaydedilirken bir hata oluştu.");
           console.error("Save Look Error:", error);
       }
+    };
 
   // 3 KADEMELİ TEPSİ MATEMATİĞİ
   const TRAY_HEIGHT = height * 0.85; 
