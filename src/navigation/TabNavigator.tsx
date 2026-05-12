@@ -77,7 +77,7 @@ export default function TabNavigator() {
         animationEnabled: true,
       }}
     >
-      {/* 🚀 EKRAN SIRALAMASI VE ETİKETLER */}
+      {/* 🚀 EKRAN SIRALAMASI VE ETİKETLER [ Ekranların Takma Adları ] */}
       <Tab.Screen name="Network" component={SocialScreen} options={{ tabBarLabel: 'Network' }} />
       <Tab.Screen name="Shop" component={ShopScreen} options={{ tabBarLabel: 'Shop' }} />
       <Tab.Screen name="Style" component={StylistScreen} options={{ tabBarLabel: 'Style' }} />

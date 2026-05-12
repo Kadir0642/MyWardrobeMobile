@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Alert, Dimensions } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, FlatList, ScrollView } from 'react-native';
 import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import PremiumAlert from '../PremiumAlert';
 
@@ -11,11 +11,20 @@ interface ARItemSelectorTrayProps {
   setSelectedItems: (items: any[]) => void;
 }
 
+const CATEGORIES = ['ALL', 'TOPS', 'BOTTOMS', 'FOOTWEAR', 'OUTERWEAR', 'ACCESSORIES'];
+
 export default function ARItemSelectorTray({ allWardrobe, allOutfits = [], setSelectedItems }: ARItemSelectorTrayProps) {
   const [activeTab, setActiveTab] = useState<'Shop' | 'Clothes' | 'Outfits'>('Clothes'); 
+  const [activeCategory, setActiveCategory] = useState('ALL'); // 🚀 FİLTRELEME STATE'İ
   const [selectedIds, setSelectedIds] = useState<string[]>([]); 
   const [selectedOutfitId, setSelectedOutfitId] = useState<string | null>(null);
   const [shopAlertVisible, setShopAlertVisible] = useState(false);
+
+  // 🚀 PERFORMANS: Sadece seçili kategorideki ürünleri hesapla
+  const filteredWardrobe = useMemo(() => {
+    if (activeCategory === 'ALL') return allWardrobe;
+    return allWardrobe.filter(item => item.category?.toUpperCase() === activeCategory);
+  }, [allWardrobe, activeCategory]);
 
   const toggleItemSelection = (item: any) => {
     setSelectedOutfitId(null); 
@@ -26,39 +35,79 @@ export default function ARItemSelectorTray({ allWardrobe, allOutfits = [], setSe
       newSelectedIds.push(item.id);
     }
     setSelectedIds(newSelectedIds);
-    
     const newSelectedItems = allWardrobe.filter(wardrobeItem => newSelectedIds.includes(wardrobeItem.id));
     setSelectedItems(newSelectedItems);
   };
 
-// 🚀 KOMBİN SEÇME VE İPTAL ETME (TOGGLE) MANTIĞI
   const handleOutfitSelection = (outfit: any) => {
     if (!outfit || !outfit.items) return;
-
-    // 🚀 EĞER TIKLANAN KOMBİN ZATEN SEÇİLİYSE -> SEÇİMİ İPTAL ET
     if (selectedOutfitId === outfit.id) {
       setSelectedOutfitId(null);
       setSelectedIds([]);
       setSelectedItems([]);
-      return; // Fonksiyonu burada durdur
+      return; 
     }
-    
-    // EĞER SEÇİLİ DEĞİLSE -> YENİ KOMBİNİ SEÇ
     setSelectedOutfitId(outfit.id);
     const outfitItemIds = outfit.items.map((item: any) => item.id);
     setSelectedIds(outfitItemIds);
     setSelectedItems(outfit.items);
   };
 
-  // 🚀 DÜZELTİLDİ: Sadece Premium Modal'ı açar, sekmeyi değiştirmez!
-  const handleShopClick = () => {
-    setShopAlertVisible(true);
-  };
+  const handleShopClick = () => setShopAlertVisible(true);
+
+  // 🚀 FLATLIST RENDER FONKSİYONU (Kıyafetler İçin)
+  const renderClothingItem = ({ item }: { item: any }) => (
+    <TouchableOpacity 
+      style={[styles.itemCard, selectedIds.includes(item.id) && styles.itemCardSelected]}
+      activeOpacity={0.8}
+      onPress={() => toggleItemSelection(item)}
+    >
+      <Image source={{ uri: item.uri }} style={styles.itemImage} />
+      <Text style={styles.itemBrandText} numberOfLines={1}>
+        {item.brand ? item.brand.toUpperCase() : (item.category ? item.category.toUpperCase() : 'VESTIFY')}
+      </Text>
+      <TouchableOpacity style={styles.heartIcon} activeOpacity={0.7}>
+        <MaterialCommunityIcons name="heart-outline" size={14} color="#666" />
+      </TouchableOpacity>
+      {selectedIds.includes(item.id) && (
+        <View style={styles.checkBadge}>
+            <MaterialCommunityIcons name="check-bold" size={14} color="#FFF" />
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+
+  // 🚀 FLATLIST RENDER FONKSİYONU (Kombinler İçin)
+  const renderOutfitItem = ({ item: outfit }: { item: any }) => (
+    <TouchableOpacity 
+      style={[styles.outfitCard, selectedOutfitId === outfit.id && styles.outfitCardSelected]}
+      activeOpacity={0.8}
+      onPress={() => handleOutfitSelection(outfit)}
+    >
+      <View style={styles.outfitPreview}>
+        {outfit.items?.slice(0, 2).map((item: any, idx: number) => (
+          <Image key={idx} source={{ uri: item.uri }} style={styles.outfitThumb} />
+        ))}
+        {outfit.items?.length > 2 && (
+          <View style={styles.outfitMoreCount}>
+            <Text style={styles.outfitMoreText}>+{outfit.items.length - 2}</Text>
+          </View>
+        )}
+      </View>
+      <View style={styles.outfitInfoContainer}>
+        <Text style={styles.outfitName}>{outfit.name ? outfit.name : 'My Outfit'}</Text>
+        <Text style={styles.outfitBrandText}>{outfit.items?.length || 0} Pieces • Vestify Look</Text>
+      </View>
+      {selectedOutfitId === outfit.id && (
+        <View style={styles.checkBadge}>
+            <MaterialCommunityIcons name="check-bold" size={14} color="#FFF" />
+        </View>
+      )}
+    </TouchableOpacity>
+  );
 
   return (
     <View style={styles.trayContainer}>
-
-        {/* 🚀 PREMIUM MAĞAZA UYARISI (En tepeye alındı ki tüm tepsiyi kaplasın) */}
       <PremiumAlert
         visible={shopAlertVisible}
         title="The Store Is Coming Soon.!"
@@ -85,7 +134,6 @@ export default function ARItemSelectorTray({ allWardrobe, allOutfits = [], setSe
         ))}
       </View>
 
-      {/* SHOP SEKMESİ */}
       {activeTab === 'Shop' && (
         <View style={styles.premiumEmptyState}>
           <View style={styles.premiumIconCircle}>
@@ -96,95 +144,63 @@ export default function ARItemSelectorTray({ allWardrobe, allOutfits = [], setSe
         </View>
       )}
 
-      {/* 🚀 OUTFITS SEKMESİ (KULLANICININ VERDİĞİ İSİMLE LİSTELENİR) */}
+{/* 🚀 YÜKSEK PERFORMANSLI OUTFITS SEKMESİ */}
       {activeTab === 'Outfits' && (
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <View style={styles.outfitGrid}>
-            {allOutfits.length === 0 ? (
-              <View style={{alignItems: 'center', marginTop: 40}}>
-                <Text style={{color: '#666'}}>No outfits found. Create one from the Canvas tab!</Text>
-              </View>
-            ) : (
-              allOutfits.map((outfit) => (
-                <TouchableOpacity 
-                  key={outfit.id} 
-                  style={[styles.outfitCard, selectedOutfitId === outfit.id && styles.outfitCardSelected]}
-                  activeOpacity={0.8}
-                  onPress={() => handleOutfitSelection(outfit)}
-                >
-                  <View style={styles.outfitPreview}>
-                    {outfit.items?.slice(0, 2).map((item: any, idx: number) => (
-                      <Image key={idx} source={{ uri: item.uri }} style={styles.outfitThumb} />
-                    ))}
-                    {outfit.items?.length > 2 && (
-                      <View style={styles.outfitMoreCount}>
-                        <Text style={styles.outfitMoreText}>+{outfit.items.length - 2}</Text>
-                      </View>
-                    )}
-                  </View>
-                  
-                  {/* 🚀 KOMBİN İSMİ: Kullanıcı ne yazdıysa o (outfit.name) */}
-                  <View style={styles.outfitInfoContainer}>
-                    <Text style={styles.outfitName}>
-                      {outfit.name ? outfit.name : 'My Outfit'}
-                    </Text>
-                    <Text style={styles.outfitBrandText}>{outfit.items?.length || 0} Pieces • Vestify Look</Text>
-                  </View>
-
-                  {selectedOutfitId === outfit.id && (
-                    <View style={styles.checkBadge}>
-                       <MaterialCommunityIcons name="check-bold" size={14} color="#FFF" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))
-            )}
-          </View>
-        </ScrollView>
+        <FlatList
+          data={allOutfits}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={renderOutfitItem}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          
+          // 🚀 MUAZZAM OPTİMİZASYON (Clothes sekmesindeki gibi)
+          initialNumToRender={20} // İlk açılışta 20 tane yükler
+          maxToRenderPerBatch={10} // Kaydırdıkça 10'ar 10'ar çizer (Telefonu kastırmaz)
+          windowSize={5} // Ekranda görünmeyen üstteki kombinleri hafızadan siler!
+          removeClippedSubviews={true} // Ekran dışı resimleri render etmeyi durdurur
+          
+          ListEmptyComponent={
+            <View style={{alignItems: 'center', marginTop: 40}}>
+              <Text style={{color: '#666'}}>No outfits found. Create one from the Canvas tab!</Text>
+            </View>
+          }
+        />
       )}
 
-      {/* 🚀 CLOTHES SEKMESİ (KULLANICININ GİRDİĞİ MARKA İLE LİSTELENİR) */}
+      {/* 🚀 YÜKSEK PERFORMANSLI CLOTHES SEKMESİ */}
       {activeTab === 'Clothes' && (
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={{ flex: 1 }}>
+          
+          {/* 🚀 YENİ: Kategori Filtreleme Çubuğu */}
           <View style={styles.filterSortBar}>
-            <TouchableOpacity style={styles.sortButton} activeOpacity={0.7}>
-              <Text style={styles.filterSortText}>Sort</Text>
-              <MaterialCommunityIcons name="sort-variant" size={18} color="#D4AF37" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.filterButton} activeOpacity={0.7}>
-              <MaterialCommunityIcons name="filter-variant" size={18} color="#D4AF37" />
-              <Text style={styles.filterSortText}>Filter (747)</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.gridList}>
-            {allWardrobe.map((item, index) => (
-              <TouchableOpacity 
-                key={index} 
-                style={[styles.itemCard, selectedIds.includes(item.id) && styles.itemCardSelected]}
-                activeOpacity={0.8}
-                onPress={() => toggleItemSelection(item)}
-              >
-                <Image source={{ uri: item.uri }} style={styles.itemImage} />
-                
-                {/* 🚀 MARKA YAZISI: Kullanıcı ne girdiyse (item.brand), BÜYÜK HARFLE ve şık bir şekilde! */}
-                <Text style={styles.itemBrandText} numberOfLines={1}>
-                  {item.brand ? item.brand.toUpperCase() : (item.category ? item.category.toUpperCase() : 'VESTIFY')}
-                </Text>
-
-                <TouchableOpacity style={styles.heartIcon} activeOpacity={0.7}>
-                  <MaterialCommunityIcons name="heart-outline" size={14} color="#666" />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
+              {CATEGORIES.map(cat => (
+                <TouchableOpacity 
+                  key={cat} 
+                  style={[styles.categoryPill, activeCategory === cat && styles.categoryPillActive]}
+                  onPress={() => setActiveCategory(cat)}
+                >
+                  <Text style={[styles.categoryPillText, activeCategory === cat && styles.categoryPillTextActive]}>
+                    {cat}
+                  </Text>
                 </TouchableOpacity>
-
-                {selectedIds.includes(item.id) && (
-                  <View style={styles.checkBadge}>
-                     <MaterialCommunityIcons name="check-bold" size={14} color="#FFF" />
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
+              ))}
+            </ScrollView>
           </View>
-        </ScrollView>
+
+          <FlatList
+            data={filteredWardrobe}
+            keyExtractor={(item) => item.id.toString()}
+            numColumns={3}
+            renderItem={renderClothingItem}
+            contentContainerStyle={styles.flatListContent}
+            columnWrapperStyle={styles.columnWrapper}
+            showsVerticalScrollIndicator={false}
+            initialNumToRender={15} // İlk açılışta sadece 15 parça yükler, kasmayı engeller
+            maxToRenderPerBatch={10}
+            windowSize={5}
+          />
+        </View>
       )}
     </View>
   );
@@ -197,35 +213,25 @@ const styles = StyleSheet.create({
   tabButtonActive: { borderBottomWidth: 2, borderBottomColor: '#D4AF37' },
   tabText: { fontSize: 12, fontWeight: '600', color: '#A0A0A0' },
   tabTextActive: { color: '#111', fontWeight: '800' },
-  scrollContent: { paddingHorizontal: 15, paddingBottom: 100, paddingTop: 15 },
+  scrollContent: { paddingHorizontal: 15, paddingBottom: 100, paddingTop: 15, gap: 15 },
+  flatListContent: { paddingHorizontal: 15, paddingBottom: 100, paddingTop: 5 },
+  columnWrapper: { justifyContent: 'flex-start', gap: 12, marginBottom: 12 },
   
-  filterSortBar: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15, paddingHorizontal: 5 },
-  sortButton: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFF', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: '#EBE8DF' },
-  filterButton: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFF', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: '#EBE8DF' },
-  filterSortText: { fontSize: 13, fontWeight: '700', color: '#111' },
+  // 🚀 YENİ Kategori Filtre Stilleri
+  filterSortBar: { flexDirection: 'row', marginBottom: 15, paddingHorizontal: 5, paddingVertical: 5 },
+  categoryScroll: { paddingHorizontal: 10 },
+  categoryPill: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 16, backgroundColor: '#EBE8DF', marginRight: 8, borderWidth: 1, borderColor: '#D1CFC7' },
+  categoryPillActive: { backgroundColor: '#1A1A1A', borderColor: '#1A1A1A' },
+  categoryPillText: { fontSize: 11, fontWeight: '700', color: '#666' },
+  categoryPillTextActive: { color: '#FFF' },
 
-  // 🚀 CLOTHES KARTLARI
-  gridList: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center' },
-  itemCard: { 
-    width: (width * 0.9 - 24) / 3, 
-    height: (width * 0.9 - 24) / 3, 
-    borderRadius: 16, 
-    backgroundColor: '#2A2A2A', 
-    borderWidth: 2, 
-    borderColor: '#333333', 
-    overflow: 'hidden', 
-    padding: 6, 
-    justifyContent: 'space-between', 
-    alignItems: 'center' 
-  },
+  // KART STİLLERİ
+  itemCard: { width: (width * 0.9 - 24) / 3, height: (width * 0.9 - 24) / 3, borderRadius: 16, backgroundColor: '#2A2A2A', borderWidth: 2, borderColor: '#333333', overflow: 'hidden', padding: 6, justifyContent: 'space-between', alignItems: 'center' },
   itemCardSelected: { borderColor: '#84ef09', backgroundColor: '#334020' }, 
   itemImage: { width: '100%', height: '75%', resizeMode: 'contain' },
   itemBrandText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800', marginTop: 2, textAlign: 'center', letterSpacing: 0.5 },
   heartIcon: { position: 'absolute', top: 6, right: 6, padding: 2 },
   checkBadge: { position: 'absolute', bottom: 6, right: 6, backgroundColor: '#84ef09', borderRadius: 12, width: 22, height: 22, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#2A2A2A' },
-
-  // 🚀 OUTFITS KARTLARI
-  outfitGrid: { flexDirection: 'column', gap: 15 },
   outfitCard: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 15, borderWidth: 2, borderColor: '#EBE8DF', flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 2 },
   outfitCardSelected: { borderColor: '#D4AF37', backgroundColor: '#FAF8F5' },
   outfitPreview: { flexDirection: 'row', gap: -15, marginRight: 15 },
@@ -235,7 +241,6 @@ const styles = StyleSheet.create({
   outfitInfoContainer: { flex: 1, flexDirection: 'column' },
   outfitName: { fontSize: 16, fontWeight: '700', color: '#111' },
   outfitBrandText: { fontSize: 11, fontWeight: '600', color: '#888', marginTop: 2 },
-
   premiumEmptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40, marginTop: -275 },
   premiumIconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(212, 175, 55, 0.1)', justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
   premiumEmptyTitle: { fontSize: 22, fontWeight: '800', color: '#111', marginBottom: 40 },

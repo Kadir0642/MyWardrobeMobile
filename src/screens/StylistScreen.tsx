@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Image } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useFocusEffect, useNavigation } from '@react-navigation/native'; // 🚀 useNavigation eklendi
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'; // useNavigation eklendi
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile } from '../context/ProfileContext';
 import * as Location from 'expo-location';
@@ -12,13 +12,14 @@ import { ClothingItem } from '../types';
 import AISuggestionsTab from '../components/Stylist/AISuggestionsTab';
 import DressMeTab from '../components/Stylist/DressMeTab';
 import CanvasTab from '../components/Stylist/CanvasTab';
-import ARTryOnTab from '../components/Stylist/ARTryOnTab'; // 🚀 YENİ EKLENEN AR BÖLMESİ
+import ARTryOnTab from '../components/Stylist/ARTryOnTab'; //  YENİ EKLENEN AR BÖLMESİ
 
 const CURRENT_USER_ID = 1; 
 
 export default function StylistScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>(); //  Yönlendirme motoru
+  const route = useRoute<any>(); // 🚀 YENİ: Wardrobe'dan gelen kargoyu yakalayacak
   const { profileImage } = useProfile();
   const defaultAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
 
@@ -36,6 +37,14 @@ export default function StylistScreen() {
   
   const [allWardrobe, setAllWardrobe] = useState<{id: string, uri: string, category: string, brand?: string}[]>([]); // 1. DÜZELTME: brand eklendi
   const [allOutfits, setAllOutfits] = useState<any[]>([]); // 2. DÜZELTME: allOutfits state'i eklendi
+
+  // Eğer Wardrobe'dan "Try it on" ile geldiysek, otomatik AR sekmesine geç!
+  useEffect(() => {
+    if (route.params?.preselectedClothes) {
+      setActiveTab('AR Try-On');
+    }
+  }, [route.params?.preselectedClothes]);
+
 
   // ☁️ HAVA DURUMU SİSTEMİ
   useEffect(() => {
@@ -180,7 +189,7 @@ useFocusEffect(
         {activeTab === 'Dress Me' && <DressMeTab allWardrobe={allWardrobe} is3DMode={is3DMode} />}
         {activeTab === 'Canvas' && <CanvasTab allWardrobe={allWardrobe} />}
         {activeTab === 'AI-Suggest' && <AISuggestionsTab allWardrobe={allWardrobe} weather={weather}/>}
-        {activeTab === 'AR Try-On' && <ARTryOnTab allWardrobe={allWardrobe} allOutfits={allOutfits} />}
+        {activeTab === 'AR Try-On' && <ARTryOnTab allWardrobe={allWardrobe} allOutfits={allOutfits} route={route} />}
       </View>
 
     </View>

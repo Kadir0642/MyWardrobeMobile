@@ -229,8 +229,12 @@ export default function WardrobeScreen({ navigation }: any) {
           onRefresh={onRefresh}
           onEndReached={loadMoreOutfits}
           onOutfitPress={(outfit) => navigation.navigate('OutfitDetail', { outfit })}
-          // 🚀 İÇ İÇE (NESTED) NAVİGATÖR DÜZELTMESİ (Kırmızı hatayı giderir)
-          onTryOnNavigate={(clothes) => navigation.navigate('Stylist', { screen: 'ARTryOnTab', params: { preselectedClothes: clothes } })}
+          // 🚀 YENİ (DOĞRU) HALİ: Doğrudan StylistScreen'e yolluyoruz.
+          // ARTryOnTab.tsx bir "ekran" (screen) değil, 
+          // StylistScreen'in içinde çağrılan bir bileşen (component). 
+          // Bu yüzden doğrudan onun içine yönlendirme yapamayız.
+          // (TabNavigator'daki gerçek adı: 'Style')
+          onTryOnNavigate={(clothes) => navigation.navigate('Style', { preselectedClothes: clothes })}
         />
       )}
 
