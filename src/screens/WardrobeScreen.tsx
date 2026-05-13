@@ -4,14 +4,10 @@ import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import ViewToggle from '../components/wardrobe/ViewToggle'; 
-
-// 🚀 İMPORTLARIMIZ
 import { useProfile } from '../context/ProfileContext';
 import { apiClient } from '../api/client';
 import { useWardrobeItems } from '../hooks/useWardrobeItems';
 import { useOutfits } from '../hooks/useOutfits';
-
-// 🚀 BİLEŞENLER VE EKRANLAR
 import CategorySelector from '../components/wardrobe/CategorySelector';
 import AnimatedInsiderButton from '../components/wardrobe/AnimatedInsiderButton';
 import ItemsTabView from './wardrobe/ItemsTabView';
@@ -21,18 +17,20 @@ const { width } = Dimensions.get('window');
 
 export default function WardrobeScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
-  
-  // 🚀 YENİ STATE: Görünüm Modu
   const [outfitViewMode, setOutfitViewMode] = useState<'PIECES' | 'LOOKS'>('PIECES');
 
-  // 🚀 1. GLOBAL USER ID
   const { profileImage, currentUserId } = useProfile();
   
-  // 🚀 2. CUSTOM HOOKLAR 
+  // 1. ITEMS HOOK'U (Kıyafetler)
   const { items, totalCount: itemsCount, isLoadingMore, fetchWardrobe, loadMoreItems } = useWardrobeItems(currentUserId);
-  const { outfits, totalCount: outfitsCount, isLoadingMore: isLoadingOutfits, fetchOutfits, loadMoreOutfits } = useOutfits(currentUserId);
+  
+  // 🚀 2. YENİ OUTFITS HOOK'U (İkili Sistem)
+  const { 
+    regularOutfits, regularTotalCount, isLoadingMoreRegular, fetchRegularOutfits, loadMoreRegular,
+    lookbookOutfits, lookbookTotalCount, isLoadingMoreLookbook, fetchLookbooks, loadMoreLookbooks,
+    fetchAllOutfits 
+  } = useOutfits(currentUserId);
 
-  // 🚀 3. UI STATE'LERİ
   const [mainTab, setMainTab] = useState<'ITEMS' | 'OUTFITS' | 'LOOKBOOKS'>('ITEMS');
   const [activeCategory, setActiveCategory] = useState('ALL');
   const [displayItems, setDisplayItems] = useState<any[]>([]);
@@ -43,7 +41,6 @@ export default function WardrobeScreen({ navigation }: any) {
   
   const loadingProgress = useRef(new Animated.Value(0)).current;
 
-  // Filtreleme Mantığı
   useEffect(() => {
     if (activeCategory === 'ALL') {
       setDisplayItems(items);
@@ -52,24 +49,21 @@ export default function WardrobeScreen({ navigation }: any) {
     }
   }, [activeCategory, items]);
 
-  // Yenileme Mantığı
+  // 🚀 YENİLENMİŞ onRefresh FONKSİYONU
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    if (mainTab === 'ITEMS') {
-      await fetchWardrobe(0, true);
-    } else if (mainTab === 'OUTFITS') {
-      await fetchOutfits(0, true);
-    }
+    if (mainTab === 'ITEMS') await fetchWardrobe(0, true);
+    else if (mainTab === 'OUTFITS') await fetchRegularOutfits(0, true);
+    else if (mainTab === 'LOOKBOOKS') await fetchLookbooks(0, true);
     setRefreshing(false);
-  }, [mainTab, fetchWardrobe, fetchOutfits]);
+  }, [mainTab, fetchWardrobe, fetchRegularOutfits, fetchLookbooks]);
 
-  // Sayfa Yüklendiğinde
+  // 🚀 SAYFA İLK AÇILDIĞINDA TÜM VERİLERİ (ITEMS, REGULAR, LOOKBOOK) ÇEKER
   useEffect(() => {
     fetchWardrobe(0, true);
-    fetchOutfits(0, true);
+    fetchAllOutfits(true); 
   }, [currentUserId]);
 
-  // Animasyon Kontrolü
   useEffect(() => {
     if (uploadStatus === 'uploading') {
       Animated.loop(Animated.sequence([
@@ -85,63 +79,36 @@ export default function WardrobeScreen({ navigation }: any) {
 
   const barWidth = loadingProgress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
-  // 🚀 GÖRSEL YÜKLEME VE POLLING MANTIĞI
   const pickAndUploadImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({ 
-      mediaTypes: ['images'], 
-      allowsEditing: false, 
-      allowsMultipleSelection: true, 
-      selectionLimit: 5,             
-      quality: 0.8 
-    });
-
+    let result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, allowsMultipleSelection: true, selectionLimit: 5, quality: 0.8 });
     if (!result.canceled && result.assets.length > 0) {
       setUploadStatus('uploading'); 
       let successCount = 0; 
       const existingIdsBeforeUpload = new Set(items.map(i => i.id));
-
       for (let i = 0; i < result.assets.length; i++) {
         const imageUri = result.assets[i].uri;
         const formData = new FormData();
         formData.append('image', { uri: imageUri, name: `wardrobe_item_${i}.jpg`, type: 'image/jpeg' } as any);
-
         try {
-          const extractResponse = await apiClient.post(`/clothes/${currentUserId}/ai-extract`, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-          });
-
+          const extractResponse = await apiClient.post(`/clothes/${currentUserId}/ai-extract`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
           if (extractResponse.status === 202 || extractResponse.status === 200) {
             const taskId = extractResponse.data.task_id;
             let isDone = false;
-            
             while (!isDone) {
               await new Promise(resolve => setTimeout(resolve, 3000));
               const statusResponse = await apiClient.get(`/clothes/${currentUserId}/ai-status/${taskId}`);
               const statusData = statusResponse.data;
-
-              if (statusData.status === 'COMPLETED') {
-                successCount++;
-                isDone = true; 
-              } else if (statusData.status === 'FAILURE') {
-                isDone = true; 
-              }
+              if (statusData.status === 'COMPLETED') { successCount++; isDone = true; } 
+              else if (statusData.status === 'FAILURE') { isDone = true; }
             }
           }
-        } catch (error) { 
-          console.error(`${i + 1}. fotoğraf yüklenirken hata oluştu:`, error);
-        }
+        } catch (error) { console.error(`${i + 1}. fotoğraf yüklenirken hata oluştu:`, error); }
       }
-
       if (successCount > 0) {
         const freshItems = await fetchWardrobe(0, true); 
         if (freshItems) {
-          const newlyAddedIds = freshItems
-            .filter((item: any) => !existingIdsBeforeUpload.has(item.id))
-            .map((item: any) => item.id);
-            
-          if (newlyAddedIds.length > 0) {
-            setNewItemIds(prev => [...prev, ...newlyAddedIds]); 
-          }
+          const newlyAddedIds = freshItems.filter((item: any) => !existingIdsBeforeUpload.has(item.id)).map((item: any) => item.id);
+          if (newlyAddedIds.length > 0) setNewItemIds(prev => [...prev, ...newlyAddedIds]); 
         }
         setUploadStatus('completed');
       } else {
@@ -155,7 +122,6 @@ export default function WardrobeScreen({ navigation }: any) {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       
-      {/* 🚀 ÜST YÜKLEME BANNERI */}
       {uploadStatus !== 'idle' && (
         <View style={[styles.loadingBanner, uploadStatus === 'completed' && { backgroundColor: '#E8F5E9' }]}>
           <Text style={[styles.loadingBannerText, uploadStatus === 'completed' && { color: '#2E7D32' }]}>
@@ -167,7 +133,6 @@ export default function WardrobeScreen({ navigation }: any) {
         </View>
       )}
 
-      {/* 🚀 HEADER */}
       <View style={styles.headerRow}>
         <Image source={profileImage ? { uri: profileImage } : { uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200' }} style={styles.headerProfileImage} />
         <Text style={styles.logoText}>VESTIFY</Text>
@@ -184,7 +149,6 @@ export default function WardrobeScreen({ navigation }: any) {
         <MaterialCommunityIcons name="wave" size={30} color="#1A1A1A" />
       </View>
 
-      {/* 🚀 TAB SEÇİCİ */}
       <View style={styles.tabsRow}>
         <TouchableOpacity style={[styles.tabItem, mainTab === 'ITEMS' && styles.tabItemActive]} onPress={() => setMainTab('ITEMS')}>
           <Text style={[styles.tabTitle, mainTab === 'ITEMS' && styles.tabTitleActive]}>ITEMS</Text>
@@ -193,75 +157,61 @@ export default function WardrobeScreen({ navigation }: any) {
         
         <TouchableOpacity style={[styles.tabItem, styles.tabCenterBorder, mainTab === 'OUTFITS' && styles.tabItemActive]} onPress={() => setMainTab('OUTFITS')}>
           <Text style={[styles.tabTitle, mainTab === 'OUTFITS' && styles.tabTitleActive]}>OUTFITS</Text>
-          <Text style={styles.tabCount}>({outfitsCount})</Text> 
+          {/* 🚀 GERÇEK TOPLAM REGULAR OUTFIT SAYISI */}
+          <Text style={styles.tabCount}>({regularTotalCount})</Text> 
         </TouchableOpacity>
         
         <TouchableOpacity style={[styles.tabItem, mainTab === 'LOOKBOOKS' && styles.tabItemActive]} onPress={() => setMainTab('LOOKBOOKS')}>
           <Text style={[styles.tabTitle, mainTab === 'LOOKBOOKS' && styles.tabTitleActive]}>LOOKBOOKS</Text>
-          <Text style={styles.tabCount}>(0)</Text>
+          {/* 🚀 GERÇEK TOPLAM LOOKBOOK SAYISI */}
+          <Text style={styles.tabCount}>({lookbookTotalCount})</Text>
         </TouchableOpacity>
       </View>
 
-      {/* 🚀 İÇERİK ALANI */}
       {mainTab === 'ITEMS' && (
         <>
           <CategorySelector activeCategory={activeCategory} onSelectCategory={setActiveCategory} />
           <ItemsTabView 
-            items={displayItems} 
-            numColumns={numColumns} 
-            isLoadingMore={isLoadingMore}
-            refreshing={refreshing}
-            newItemIds={newItemIds}
-            onRefresh={onRefresh}
-            onEndReached={loadMoreItems}
+            items={displayItems} numColumns={numColumns} isLoadingMore={isLoadingMore} refreshing={refreshing}
+            newItemIds={newItemIds} onRefresh={onRefresh} onEndReached={loadMoreItems}
             onItemPress={(item) => navigation.navigate('ItemDetail', { item })}
           />
         </>
       )}
 
+      {/* 🚀 REGULAR OUTFITS TABLO GÖRÜNÜMÜ */}
       {mainTab === 'OUTFITS' && (
         <OutfitsTabView 
-          outfits={outfits} 
-          numColumns={numColumns}
-          viewMode={outfitViewMode} 
-          isLoadingMore={isLoadingOutfits}
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          onEndReached={loadMoreOutfits}
-          onOutfitPress={(outfit) => navigation.navigate('OutfitDetail', { outfit })}
-          // 🚀 YENİ (DOĞRU) HALİ: Doğrudan StylistScreen'e yolluyoruz.
-          // ARTryOnTab.tsx bir "ekran" (screen) değil, 
-          // StylistScreen'in içinde çağrılan bir bileşen (component). 
-          // Bu yüzden doğrudan onun içine yönlendirme yapamayız.
-          // (TabNavigator'daki gerçek adı: 'Style')
+          outfits={regularOutfits} 
+          numColumns={numColumns} viewMode={outfitViewMode} isLoadingMore={isLoadingMoreRegular} refreshing={refreshing}
+          onRefresh={onRefresh} onEndReached={loadMoreRegular}
+          onOutfitPress={(outfit) => navigation.navigate('OutfitDetail', { outfit })} 
           onTryOnNavigate={(clothes) => navigation.navigate('Style', { preselectedClothes: clothes })}
         />
       )}
 
+      {/* 🚀 LOOKBOOKS TABLO GÖRÜNÜMÜ */}
       {mainTab === 'LOOKBOOKS' && (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-           <Text style={{ color: '#888', fontSize: 16 }}>Lookbooks çok yakında burada olacak!</Text>
-        </View>
+        <OutfitsTabView 
+          outfits={lookbookOutfits} 
+          numColumns={numColumns} viewMode={outfitViewMode} isLoadingMore={isLoadingMoreLookbook} refreshing={refreshing}
+          onRefresh={onRefresh} onEndReached={loadMoreLookbooks}
+          onOutfitPress={(outfit) => navigation.navigate('OutfitDetail', { outfit })} 
+          onTryOnNavigate={(clothes) => navigation.navigate('Style', { preselectedClothes: clothes })}
+        />
       )}
 
-      {/* 🚀 SAĞ ALT YÜZEN KONTROL GRUBU (Tüm Yüzen Butonlar Burada) */}
       <View style={styles.floatingControls}>
-
-              {/* Her iki sekmede de görünen Grid ızgara düğmesi */}
-        {(mainTab === 'ITEMS' || mainTab === 'OUTFITS') && (
+        {(mainTab === 'ITEMS' || mainTab === 'OUTFITS' || mainTab === 'LOOKBOOKS') && (
           <TouchableOpacity style={styles.gridToggleBtn} onPress={() => setNumColumns(numColumns === 2 ? 3 : 2)}>
             <Feather name={numColumns === 2 ? "grid" : "columns"} size={20} color="#1A1A1A" />
           </TouchableOpacity>
         )}
-        
-        {/* Sadece OUTFITS sekmesinde görünen görünüm anahtarı */}
-        {mainTab === 'OUTFITS' && (
+        {(mainTab === 'OUTFITS' || mainTab === 'LOOKBOOKS') && (
           <ViewToggle activeView={outfitViewMode} onViewChange={setOutfitViewMode} />
         )}
-  
       </View>
 
-      {/* 🚀 PLUS YÜKLEME BUTONU (Sadece ITEMS Sekmesinde) */}
       {mainTab === 'ITEMS' && (
         <TouchableOpacity style={styles.aiUploadButton} activeOpacity={0.9} onPress={pickAndUploadImage}>
           <Feather name="plus" size={36} color="#E07A5F" />
@@ -290,8 +240,6 @@ const styles = StyleSheet.create({
   tabTitle: { fontSize: 14, fontWeight: '600', color: '#888' },
   tabTitleActive: { color: '#1A1A1A', fontWeight: '800' }, 
   tabCount: { fontSize: 14, color: '#666', marginTop: 2 },
-  
-  // 🚀 DÜZELTİLMİŞ VE TEKİLLEŞTİRİLMİŞ YÜZEN KONTROL STİLLERİ
   floatingControls: { position: 'absolute', bottom: 100, right: 20, alignItems: 'flex-end', gap: 12, zIndex: 100 },
   gridToggleBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4 },
   aiUploadButton: { position: 'absolute', bottom: 30, right: 20, width: 64, height: 64, borderRadius: 32, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#E07A5F', justifyContent: 'center', alignItems: 'center', shadowColor: '#E07A5F', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 }
