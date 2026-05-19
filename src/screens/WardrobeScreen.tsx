@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Animated, Dimensions, Alert } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Animated, Dimensions, Alert, ScrollView } from 'react-native';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -24,14 +24,16 @@ export default function WardrobeScreen({ navigation }: any) {
   // 1. ITEMS HOOK'U (Kıyafetler)
   const { items, totalCount: itemsCount, isLoadingMore, fetchWardrobe, loadMoreItems } = useWardrobeItems(currentUserId);
   
-  // 🚀 2. YENİ OUTFITS HOOK'U (İkili Sistem)
+  // 2. OUTFITS HOOK'U (İkili Sistem)
   const { 
     regularOutfits, regularTotalCount, isLoadingMoreRegular, fetchRegularOutfits, loadMoreRegular,
     lookbookOutfits, lookbookTotalCount, isLoadingMoreLookbook, fetchLookbooks, loadMoreLookbooks,
     fetchAllOutfits 
   } = useOutfits(currentUserId);
 
-  const [mainTab, setMainTab] = useState<'ITEMS' | 'OUTFITS' | 'LOOKBOOKS'>('ITEMS');
+  // 🚀 MAIN TAB STATE GÜNCELLENDİ (4 SEKME)
+  const [mainTab, setMainTab] = useState<'ITEMS' | 'OUTFITS' | 'MOODBOARDS' | 'CAPSULES'>('ITEMS');
+  
   const [activeCategory, setActiveCategory] = useState('ALL');
   const [displayItems, setDisplayItems] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -49,16 +51,15 @@ export default function WardrobeScreen({ navigation }: any) {
     }
   }, [activeCategory, items]);
 
-  // 🚀 YENİLENMİŞ onRefresh FONKSİYONU
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     if (mainTab === 'ITEMS') await fetchWardrobe(0, true);
     else if (mainTab === 'OUTFITS') await fetchRegularOutfits(0, true);
-    else if (mainTab === 'LOOKBOOKS') await fetchLookbooks(0, true);
+    else if (mainTab === 'MOODBOARDS') await fetchLookbooks(0, true);
+    // CAPSULES yenilemesi eklenecek
     setRefreshing(false);
   }, [mainTab, fetchWardrobe, fetchRegularOutfits, fetchLookbooks]);
 
-  // 🚀 SAYFA İLK AÇILDIĞINDA TÜM VERİLERİ (ITEMS, REGULAR, LOOKBOOK) ÇEKER
   useEffect(() => {
     fetchWardrobe(0, true);
     fetchAllOutfits(true); 
@@ -149,23 +150,29 @@ export default function WardrobeScreen({ navigation }: any) {
         <MaterialCommunityIcons name="wave" size={30} color="#1A1A1A" />
       </View>
 
-      <View style={styles.tabsRow}>
-        <TouchableOpacity style={[styles.tabItem, mainTab === 'ITEMS' && styles.tabItemActive]} onPress={() => setMainTab('ITEMS')}>
-          <Text style={[styles.tabTitle, mainTab === 'ITEMS' && styles.tabTitleActive]}>ITEMS</Text>
-          <Text style={styles.tabCount}>({itemsCount})</Text> 
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={[styles.tabItem, styles.tabCenterBorder, mainTab === 'OUTFITS' && styles.tabItemActive]} onPress={() => setMainTab('OUTFITS')}>
-          <Text style={[styles.tabTitle, mainTab === 'OUTFITS' && styles.tabTitleActive]}>OUTFITS</Text>
-          {/* 🚀 GERÇEK TOPLAM REGULAR OUTFIT SAYISI */}
-          <Text style={styles.tabCount}>({regularTotalCount})</Text> 
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={[styles.tabItem, mainTab === 'LOOKBOOKS' && styles.tabItemActive]} onPress={() => setMainTab('LOOKBOOKS')}>
-          <Text style={[styles.tabTitle, mainTab === 'LOOKBOOKS' && styles.tabTitleActive]}>LOOKBOOKS</Text>
-          {/* 🚀 GERÇEK TOPLAM LOOKBOOK SAYISI */}
-          <Text style={styles.tabCount}>({lookbookTotalCount})</Text>
-        </TouchableOpacity>
+      {/* 🚀 KAYDIRILABİLİR 4'LÜ SEKME MENÜSÜ */}
+      <View style={styles.tabsContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsScrollContent}>
+          <TouchableOpacity style={[styles.tabItem, mainTab === 'ITEMS' && styles.tabItemActive]} onPress={() => setMainTab('ITEMS')}>
+            <Text style={[styles.tabTitle, mainTab === 'ITEMS' && styles.tabTitleActive]}>ITEMS</Text>
+            <Text style={styles.tabCount}>({itemsCount})</Text> 
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={[styles.tabItem, mainTab === 'OUTFITS' && styles.tabItemActive]} onPress={() => setMainTab('OUTFITS')}>
+            <Text style={[styles.tabTitle, mainTab === 'OUTFITS' && styles.tabTitleActive]}>OUTFITS</Text>
+            <Text style={styles.tabCount}>({regularTotalCount})</Text> 
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={[styles.tabItem, mainTab === 'MOODBOARDS' && styles.tabItemActive]} onPress={() => setMainTab('MOODBOARDS')}>
+            <Text style={[styles.tabTitle, mainTab === 'MOODBOARDS' && styles.tabTitleActive]}>MOODBOARDS</Text>
+            <Text style={styles.tabCount}>({lookbookTotalCount})</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.tabItem, mainTab === 'CAPSULES' && styles.tabItemActive]} onPress={() => setMainTab('CAPSULES')}>
+            <Text style={[styles.tabTitle, mainTab === 'CAPSULES' && styles.tabTitleActive]}>CAPSULES</Text>
+            <Text style={styles.tabCount}>(0)</Text>
+          </TouchableOpacity>
+        </ScrollView>
       </View>
 
       {mainTab === 'ITEMS' && (
@@ -179,35 +186,46 @@ export default function WardrobeScreen({ navigation }: any) {
         </>
       )}
 
-      {/* 🚀 REGULAR OUTFITS TABLO GÖRÜNÜMÜ */}
+{/* 🚀 REGULAR OUTFITS TABLO GÖRÜNÜMÜ */}
       {mainTab === 'OUTFITS' && (
         <OutfitsTabView 
           outfits={regularOutfits} 
           numColumns={numColumns} viewMode={outfitViewMode} isLoadingMore={isLoadingMoreRegular} refreshing={refreshing}
           onRefresh={onRefresh} onEndReached={loadMoreRegular}
-          onOutfitPress={(outfit) => navigation.navigate('OutfitDetail', { outfit })} 
+          // 🚀 DEĞİŞTİRİLEN KISIM BURASI (Artık 3 parametre alıp detay ekranına 3'ünü yolluyor)
+          onOutfitPress={(outfit, outfitList, index) => navigation.navigate('OutfitDetail', { outfit, outfitList, initialIndex: index })} 
           onTryOnNavigate={(clothes) => navigation.navigate('Style', { preselectedClothes: clothes })}
         />
       )}
 
-      {/* 🚀 LOOKBOOKS TABLO GÖRÜNÜMÜ */}
-      {mainTab === 'LOOKBOOKS' && (
+      {/* 🚀 MOODBOARDS TABLO GÖRÜNÜMÜ */}
+      {mainTab === 'MOODBOARDS' && (
         <OutfitsTabView 
           outfits={lookbookOutfits} 
           numColumns={numColumns} viewMode={outfitViewMode} isLoadingMore={isLoadingMoreLookbook} refreshing={refreshing}
           onRefresh={onRefresh} onEndReached={loadMoreLookbooks}
-          onOutfitPress={(outfit) => navigation.navigate('OutfitDetail', { outfit })} 
+          // 🚀 DEĞİŞTİRİLEN KISIM BURASI
+          onOutfitPress={(outfit, outfitList, index) => navigation.navigate('OutfitDetail', { outfit, outfitList, initialIndex: index })} 
           onTryOnNavigate={(clothes) => navigation.navigate('Style', { preselectedClothes: clothes })}
         />
       )}
 
+      {/* 🚀 CAPSULES PLACEHOLDER EKRANI */}
+      {mainTab === 'CAPSULES' && (
+        <View style={styles.placeholderContainer}>
+          <MaterialCommunityIcons name="bag-suitcase" size={60} color="#DDD" />
+          <Text style={styles.placeholderTitle}>Travel Capsules</Text>
+          <Text style={styles.placeholderSub}>Plan your trips and pack smart. Coming soon!</Text>
+        </View>
+      )}
+
       <View style={styles.floatingControls}>
-        {(mainTab === 'ITEMS' || mainTab === 'OUTFITS' || mainTab === 'LOOKBOOKS') && (
+        {(mainTab === 'ITEMS' || mainTab === 'OUTFITS' || mainTab === 'MOODBOARDS') && (
           <TouchableOpacity style={styles.gridToggleBtn} onPress={() => setNumColumns(numColumns === 2 ? 3 : 2)}>
             <Feather name={numColumns === 2 ? "grid" : "columns"} size={20} color="#1A1A1A" />
           </TouchableOpacity>
         )}
-        {(mainTab === 'OUTFITS' || mainTab === 'LOOKBOOKS') && (
+        {(mainTab === 'OUTFITS' || mainTab === 'MOODBOARDS') && (
           <ViewToggle activeView={outfitViewMode} onViewChange={setOutfitViewMode} />
         )}
       </View>
@@ -233,13 +251,20 @@ const styles = StyleSheet.create({
   logoText: { fontSize: 28, fontWeight: '500', letterSpacing: 2, color: '#1A1A1A' },
   headerIcons: { flexDirection: 'row', alignItems: 'center' },
   insiderRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginVertical: 15, gap: 10 },
-  tabsRow: { flexDirection: 'row', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#D1CFC7', backgroundColor: '#F5F2EB' },
-  tabItem: { flex: 1, alignItems: 'center', paddingVertical: 10 },
-  tabItemActive: { backgroundColor: '#EBE8DF' }, 
-  tabCenterBorder: { borderLeftWidth: 1, borderRightWidth: 1, borderColor: '#D1CFC7' },
-  tabTitle: { fontSize: 14, fontWeight: '600', color: '#888' },
-  tabTitleActive: { color: '#1A1A1A', fontWeight: '800' }, 
-  tabCount: { fontSize: 14, color: '#666', marginTop: 2 },
+  
+  // 🚀 GÜNCELLENMİŞ YATAY SEKME STİLLERİ
+  tabsContainer: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#D1CFC7', backgroundColor: '#F5F2EB' },
+  tabsScrollContent: { paddingHorizontal: 10 },
+  tabItem: { paddingHorizontal: 20, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
+  tabItemActive: { backgroundColor: '#EBE8DF', borderRadius: 12, marginVertical: 4 }, 
+  tabTitle: { fontSize: 13, fontWeight: '700', color: '#888', letterSpacing: 0.5 },
+  tabTitleActive: { color: '#1A1A1A', fontWeight: '900' }, 
+  tabCount: { fontSize: 13, color: '#666', marginTop: 2, fontWeight: '600' },
+  
+  placeholderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 },
+  placeholderTitle: { fontSize: 20, fontWeight: '800', color: '#1A1A1A', marginTop: 15, marginBottom: 5 },
+  placeholderSub: { fontSize: 14, color: '#666', textAlign: 'center', lineHeight: 20 },
+
   floatingControls: { position: 'absolute', bottom: 100, right: 20, alignItems: 'flex-end', gap: 12, zIndex: 100 },
   gridToggleBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4 },
   aiUploadButton: { position: 'absolute', bottom: 30, right: 20, width: 64, height: 64, borderRadius: 32, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#E07A5F', justifyContent: 'center', alignItems: 'center', shadowColor: '#E07A5F', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 }
