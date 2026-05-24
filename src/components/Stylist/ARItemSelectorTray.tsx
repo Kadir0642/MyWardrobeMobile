@@ -11,34 +11,66 @@ interface ARItemSelectorTrayProps {
   setSelectedItems: (items: any[]) => void;
 }
 
-const CATEGORIES = ['ALL', 'TOPS', 'BOTTOMS', 'FOOTWEAR', 'OUTERWEAR', 'ACCESSORIES'];
+const CATEGORIES = ['TOPS', 'BOTTOMS', 'OUTERWEAR', 'FULL BODY'];
 
 export default function ARItemSelectorTray({ allWardrobe, allOutfits = [], setSelectedItems }: ARItemSelectorTrayProps) {
   const [activeTab, setActiveTab] = useState<'Shop' | 'Clothes' | 'Outfits'>('Clothes'); 
-  const [activeCategory, setActiveCategory] = useState('ALL'); // 🚀 FİLTRELEME STATE'İ
+  const [activeCategory, setActiveCategory] = useState('TOPS'); 
   const [selectedIds, setSelectedIds] = useState<string[]>([]); 
   const [selectedOutfitId, setSelectedOutfitId] = useState<string | null>(null);
   const [shopAlertVisible, setShopAlertVisible] = useState(false);
+  
+  // 🚀 YENİ STATE: Kombindeki çakışmaları düzelttiğimizde kullanıcıya bilgi vermek için
+  const [conflictAlertVisible, setConflictAlertVisible] = useState(false);
 
-  // 🚀 PERFORMANS: Sadece seçili kategorideki ürünleri hesapla
   const filteredWardrobe = useMemo(() => {
-    if (activeCategory === 'ALL') return allWardrobe;
     return allWardrobe.filter(item => item.category?.toUpperCase() === activeCategory);
   }, [allWardrobe, activeCategory]);
 
+  // 🚀 AKILLI DEĞİŞTİRME (AUTO-SWAP) MANTIĞI
   const toggleItemSelection = (item: any) => {
     setSelectedOutfitId(null); 
     let newSelectedIds = [...selectedIds];
+    const itemCategory = item.category?.toUpperCase();
+
     if (newSelectedIds.includes(item.id)) {
+      // Zaten seçiliyse, sadece seçimi kaldır
       newSelectedIds = newSelectedIds.filter(id => id !== item.id);
     } else {
+      // 🚀 YENİ SEÇİM: Kategori çakışmalarını önle
+      const currentSelectedItems = allWardrobe.filter(w => newSelectedIds.includes(w.id));
+
+      if (itemCategory === 'FULL BODY') {
+         // Full body (Elbise) seçilirse Tops, Bottoms ve diğer Full Body'leri sil (Ceket kalabilir)
+         const idsToRemove = currentSelectedItems
+             .filter(w => ['TOPS', 'BOTTOMS', 'FULL BODY'].includes(w.category?.toUpperCase()))
+             .map(w => w.id);
+         newSelectedIds = newSelectedIds.filter(id => !idsToRemove.includes(id));
+      }
+      else if (itemCategory === 'TOPS' || itemCategory === 'BOTTOMS') {
+         // Top veya Bottom seçilirse Full Body'yi ve AYNI kategorideki diğer ürünü sil
+         const idsToRemove = currentSelectedItems
+             .filter(w => w.category?.toUpperCase() === 'FULL BODY' || w.category?.toUpperCase() === itemCategory)
+             .map(w => w.id);
+         newSelectedIds = newSelectedIds.filter(id => !idsToRemove.includes(id));
+      }
+      else if (itemCategory === 'OUTERWEAR') {
+         // Outerwear (Ceket) seçilirse diğer Outerwear'i sil
+         const idsToRemove = currentSelectedItems
+             .filter(w => w.category?.toUpperCase() === 'OUTERWEAR')
+             .map(w => w.id);
+         newSelectedIds = newSelectedIds.filter(id => !idsToRemove.includes(id));
+      }
+
       newSelectedIds.push(item.id);
     }
+
     setSelectedIds(newSelectedIds);
     const newSelectedItems = allWardrobe.filter(wardrobeItem => newSelectedIds.includes(wardrobeItem.id));
     setSelectedItems(newSelectedItems);
   };
 
+  // 🚀 KOMBİN (OUTFIT) İÇİN AKILLI FİLTRELEME
   const handleOutfitSelection = (outfit: any) => {
     if (!outfit || !outfit.items) return;
     if (selectedOutfitId === outfit.id) {
@@ -47,22 +79,70 @@ export default function ARItemSelectorTray({ allWardrobe, allOutfits = [], setSe
       setSelectedItems([]);
       return; 
     }
+    
     setSelectedOutfitId(outfit.id);
-    const outfitItemIds = outfit.items.map((item: any) => item.id);
-    setSelectedIds(outfitItemIds);
-    setSelectedItems(outfit.items);
+
+    const validItems = outfit.items.filter((item: any) => 
+      item.category && CATEGORIES.includes(item.category.toUpperCase())
+    );
+
+    // Çakışmaları otomatik çöz
+    const finalItems: any[] = [];
+    let hasFullBody = false;
+    let hasTop = false;
+    let hasBottom = false;
+    let hasOuterwear = false;
+    let hasConflict = false; // Uyarı göstermek için
+
+    // Önce Full Body var mı diye bakalım
+    const fullBodyItem = validItems.find((i: any) => i.category?.toUpperCase() === 'FULL BODY');
+    if (fullBodyItem) {
+        finalItems.push(fullBodyItem);
+        hasFullBody = true;
+    }
+
+    for (const item of validItems) {
+        const cat = item.category?.toUpperCase();
+        if (cat === 'FULL BODY') {
+            if (item.id !== fullBodyItem?.id) hasConflict = true; 
+            continue;
+        }
+        if (cat === 'TOPS') {
+            if (hasFullBody || hasTop) { hasConflict = true; continue; } 
+            finalItems.push(item);
+            hasTop = true;
+        }
+        else if (cat === 'BOTTOMS') {
+            if (hasFullBody || hasBottom) { hasConflict = true; continue; }
+            finalItems.push(item);
+            hasBottom = true;
+        }
+        else if (cat === 'OUTERWEAR') {
+            if (hasOuterwear) { hasConflict = true; continue; }
+            finalItems.push(item);
+            hasOuterwear = true;
+        }
+    }
+
+    const validItemIds = finalItems.map((item: any) => item.id);
+    setSelectedIds(validItemIds);
+    setSelectedItems(finalItems);
+
+    // Eğer sistem fazla/çakışan kıyafetleri sildiyse kullanıcıya şık bir uyarı göster
+    if (hasConflict) {
+        setConflictAlertVisible(true);
+    }
   };
 
   const handleShopClick = () => setShopAlertVisible(true);
 
-  // 🚀 FLATLIST RENDER FONKSİYONU (Kıyafetler İçin)
   const renderClothingItem = ({ item }: { item: any }) => (
     <TouchableOpacity 
       style={[styles.itemCard, selectedIds.includes(item.id) && styles.itemCardSelected]}
       activeOpacity={0.8}
       onPress={() => toggleItemSelection(item)}
     >
-      <Image source={{ uri: item.uri }} style={styles.itemImage} />
+      <Image source={{ uri: item.imageUrl || item.uri }} style={styles.itemImage} />
       <Text style={styles.itemBrandText} numberOfLines={1}>
         {item.brand ? item.brand.toUpperCase() : (item.category ? item.category.toUpperCase() : 'VESTIFY')}
       </Text>
@@ -77,7 +157,6 @@ export default function ARItemSelectorTray({ allWardrobe, allOutfits = [], setSe
     </TouchableOpacity>
   );
 
-  // 🚀 FLATLIST RENDER FONKSİYONU (Kombinler İçin)
   const renderOutfitItem = ({ item: outfit }: { item: any }) => (
     <TouchableOpacity 
       style={[styles.outfitCard, selectedOutfitId === outfit.id && styles.outfitCardSelected]}
@@ -86,7 +165,7 @@ export default function ARItemSelectorTray({ allWardrobe, allOutfits = [], setSe
     >
       <View style={styles.outfitPreview}>
         {outfit.items?.slice(0, 2).map((item: any, idx: number) => (
-          <Image key={idx} source={{ uri: item.uri }} style={styles.outfitThumb} />
+          <Image key={idx} source={{ uri: item.imageUrl || item.uri }} style={styles.outfitThumb} />
         ))}
         {outfit.items?.length > 2 && (
           <View style={styles.outfitMoreCount}>
@@ -108,15 +187,27 @@ export default function ARItemSelectorTray({ allWardrobe, allOutfits = [], setSe
 
   return (
     <View style={styles.trayContainer}>
+      
       <PremiumAlert
         visible={shopAlertVisible}
-        title="The Store Is Coming Soon.!"
+        title="The Store Is Coming Soon!"
         message="The store integration, which will allow you to purchase these amazing pieces you've tried and loved with a single click, will be active very soon."
         onCancel={() => setShopAlertVisible(false)}
         onConfirm={() => setShopAlertVisible(false)}
         confirmText="Got it"
         cancelText="Close"
         iconName="shopping-bag"
+      />
+
+      {/* 🚀 AKILLI SEÇİM BİLDİRİMİ */}
+      <PremiumAlert
+        visible={conflictAlertVisible}
+        title="Smart Selection ✨"
+        message="Kombindeki fazla/çakışan parçalar (örneğin Elbise ve Tişörtün aynı anda olması) sanal kabin kuralları gereği otomatik filtrelendi. En iyi görünüm için optimize edildi!"
+        onCancel={() => setConflictAlertVisible(false)}
+        onConfirm={() => setConflictAlertVisible(false)}
+        confirmText="Harika"
+        iconName="layers"
       />
 
       <View style={styles.tabBarContainer}>
@@ -144,7 +235,6 @@ export default function ARItemSelectorTray({ allWardrobe, allOutfits = [], setSe
         </View>
       )}
 
-{/* 🚀 YÜKSEK PERFORMANSLI OUTFITS SEKMESİ */}
       {activeTab === 'Outfits' && (
         <FlatList
           data={allOutfits}
@@ -152,13 +242,10 @@ export default function ARItemSelectorTray({ allWardrobe, allOutfits = [], setSe
           renderItem={renderOutfitItem}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
-          
-          // 🚀 MUAZZAM OPTİMİZASYON (Clothes sekmesindeki gibi)
-          initialNumToRender={20} // İlk açılışta 20 tane yükler
-          maxToRenderPerBatch={10} // Kaydırdıkça 10'ar 10'ar çizer (Telefonu kastırmaz)
-          windowSize={5} // Ekranda görünmeyen üstteki kombinleri hafızadan siler!
-          removeClippedSubviews={true} // Ekran dışı resimleri render etmeyi durdurur
-          
+          initialNumToRender={20} 
+          maxToRenderPerBatch={10} 
+          windowSize={5} 
+          removeClippedSubviews={true} 
           ListEmptyComponent={
             <View style={{alignItems: 'center', marginTop: 40}}>
               <Text style={{color: '#666'}}>No outfits found. Create one from the Canvas tab!</Text>
@@ -167,11 +254,8 @@ export default function ARItemSelectorTray({ allWardrobe, allOutfits = [], setSe
         />
       )}
 
-      {/* 🚀 YÜKSEK PERFORMANSLI CLOTHES SEKMESİ */}
       {activeTab === 'Clothes' && (
         <View style={{ flex: 1 }}>
-          
-          {/* 🚀 YENİ: Kategori Filtreleme Çubuğu */}
           <View style={styles.filterSortBar}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
               {CATEGORIES.map(cat => (
@@ -196,7 +280,7 @@ export default function ARItemSelectorTray({ allWardrobe, allOutfits = [], setSe
             contentContainerStyle={styles.flatListContent}
             columnWrapperStyle={styles.columnWrapper}
             showsVerticalScrollIndicator={false}
-            initialNumToRender={15} // İlk açılışta sadece 15 parça yükler, kasmayı engeller
+            initialNumToRender={15} 
             maxToRenderPerBatch={10}
             windowSize={5}
           />
@@ -216,16 +300,12 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 15, paddingBottom: 100, paddingTop: 15, gap: 15 },
   flatListContent: { paddingHorizontal: 15, paddingBottom: 100, paddingTop: 5 },
   columnWrapper: { justifyContent: 'flex-start', gap: 12, marginBottom: 12 },
-  
-  // 🚀 YENİ Kategori Filtre Stilleri
   filterSortBar: { flexDirection: 'row', marginBottom: 15, paddingHorizontal: 5, paddingVertical: 5 },
   categoryScroll: { paddingHorizontal: 10 },
   categoryPill: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 16, backgroundColor: '#EBE8DF', marginRight: 8, borderWidth: 1, borderColor: '#D1CFC7' },
   categoryPillActive: { backgroundColor: '#1A1A1A', borderColor: '#1A1A1A' },
   categoryPillText: { fontSize: 11, fontWeight: '700', color: '#666' },
   categoryPillTextActive: { color: '#FFF' },
-
-  // KART STİLLERİ
   itemCard: { width: (width * 0.9 - 24) / 3, height: (width * 0.9 - 24) / 3, borderRadius: 16, backgroundColor: '#2A2A2A', borderWidth: 2, borderColor: '#333333', overflow: 'hidden', padding: 6, justifyContent: 'space-between', alignItems: 'center' },
   itemCardSelected: { borderColor: '#84ef09', backgroundColor: '#334020' }, 
   itemImage: { width: '100%', height: '75%', resizeMode: 'contain' },

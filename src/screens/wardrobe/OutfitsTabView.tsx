@@ -8,27 +8,29 @@ const { width } = Dimensions.get('window');
 interface Props {
   outfits: any[];
   numColumns: number;
-  viewMode: 'PIECES' | 'LOOKS'; // 🚀 YENİ: Ana ekrandan prop olarak alıyoruz
+  viewMode: 'PIECES' | 'LOOKS'; 
   isLoadingMore: boolean;
   refreshing: boolean;
   onRefresh: () => void;
   onEndReached: () => void;
-  onOutfitPress: (outfit: any) => void;
+  // 🚀 GÜNCELLEME: Artık sadece outfit'i değil, tam listeyi ve index'i de istiyoruz
+  onOutfitPress: (outfit: any, outfitList: any[], initialIndex: number) => void; 
   onTryOnNavigate: (clothes: any[]) => void;
 }
 
-// 🚀 İÇERİDEKİ useState ve <ViewToggle /> tamamen silindi!
 export default function OutfitsTabView({ outfits, numColumns, viewMode, isLoadingMore, refreshing, onRefresh, onEndReached, onOutfitPress, onTryOnNavigate }: Props) {
   const outfitWidth = (width - (numColumns + 1) * 10) / numColumns;
 
-  const renderOutfit = ({ item }: { item: any }) => {
+  // 🚀 GÜNCELLEME: index parametresini ekledik
+  const renderOutfit = ({ item, index }: { item: any, index: number }) => {
     return (
       <OutfitCard 
         outfit={item} 
         outfitWidth={outfitWidth} 
         numColumns={numColumns} 
         viewMode={viewMode}
-        onPress={onOutfitPress} 
+        // 🚀 Tıklanınca o anki kombin, TÜM LİSTE ve SIRA NUMARASI gider!
+        onPress={(outfitData) => onOutfitPress(outfitData, outfits, index)} 
         onTryOnPress={(outfitData) => onTryOnNavigate(outfitData.clothes)}
       />
     );
@@ -40,7 +42,7 @@ export default function OutfitsTabView({ outfits, numColumns, viewMode, isLoadin
       data={outfits} 
       numColumns={numColumns}
       keyExtractor={(item) => item.id.toString()}
-      renderItem={renderOutfit}
+      renderItem={renderOutfit} // 🚀 Güncellenmiş render fonksiyonu
       contentContainerStyle={styles.outfitListContainer}
       showsVerticalScrollIndicator={false}
       refreshing={refreshing}
@@ -59,7 +61,7 @@ export default function OutfitsTabView({ outfits, numColumns, viewMode, isLoadin
 }
 
 const styles = StyleSheet.create({
-  outfitListContainer: { paddingHorizontal: 5, paddingTop: 10, paddingBottom: 120 }, // Butonlar örtmesin diye alt boşluğu artırdık
+  outfitListContainer: { paddingHorizontal: 5, paddingTop: 10, paddingBottom: 120 }, 
   emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 50 },
   emptyText: { marginTop: 15, fontSize: 16, fontWeight: '600', color: '#888' },
 });
