@@ -1,43 +1,34 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Image, Modal, ScrollView, Dimensions, ActivityIndicator, Animated, PanResponder, Alert } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, Image, Modal, ScrollView, Dimensions, ActivityIndicator, Animated, PanResponder } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import PremiumToast from '../PremiumToast';
 import { apiClient } from '../../api/client';
-import { ClothingItem } from '../../types';
+import { COLORS, SHADOWS } from '../../theme/theme'; 
 
 const { width, height } = Dimensions.get('window');
 const CURRENT_USER_ID = 1;
+
+const AVAILABLE_CATEGORIES = ['TOPS', 'BOTTOMS', 'FOOTWEAR', 'ACCESSORIES', 'OUTERWEAR', 'FULL_BODY'];
 
 interface AISuggestionsTabProps {
   allWardrobe: any[]; 
   weather?: { temp: string; city: string; icon: string };
 }
 
-const getCollagePositions = (itemCount: number) => {
-  if (itemCount <= 4) {
-    return [
-      { top: '10%', left: '10%', width: '38%', height: '35%' },    
-      { top: '10%', right: '10%', width: '38%', height: '35%' },   
-      { top: '50%', left: '10%', width: '38%', height: '35%' },   
-      { top: '50%', right: '10%', width: '38%', height: '35%' },  
-    ];
-  } else {
-    return [
-      { top: '5%', left: '5%', width: '40%', height: '28%' },    
-      { top: '5%', right: '5%', width: '40%', height: '28%' },   
-      { top: '35%', left: '5%', width: '40%', height: '28%' },   
-      { top: '35%', right: '5%', width: '40%', height: '28%' },  
-      { top: '65%', left: '5%', width: '40%', height: '28%' },   
-      { top: '65%', right: '5%', width: '40%', height: '28%' }   
-    ];
-  }
-};
-
 export default function AISuggestionsTab({ allWardrobe = [], weather }: AISuggestionsTabProps) {
-  const [currentOutfit, setCurrentOutfit] = useState<any[]>([]);
+  const [dynamicSlots, setDynamicSlots] = useState<{id: string, category: string}[]>([
+    { id: `slot_tops_${Date.now()}`, category: 'TOPS' },
+    { id: `slot_bottoms_${Date.now()+1}`, category: 'BOTTOMS' },
+    { id: `slot_footwear_${Date.now()+2}`, category: 'FOOTWEAR' }
+  ]);
+
+  const [suggestedItems, setSuggestedItems] = useState<{ [slotId: string]: {id: string, uri: string, category: string} }>({});
   const [isLoading, setIsLoading] = useState(false);
-  const [activeBlueprintIndex, setActiveBlueprintIndex] = useState<0 | 1 | 2>(0);
-  // BİLDİRİM BURAYA GELDİ
+  const [isAddMenuVisible, setIsAddMenuVisible] = useState(false);
+  
+  // 🚀 YENİ: Görünüm Modu (Varsayılan 2'li, Tıklanırsa 3'lü)
+  const [isThreeColView, setIsThreeColView] = useState(false);
+  
   const [toastVisible, setToastVisible] = useState(false);
   const [isFeedbackVisible, setFeedbackVisible] = useState(false);
   const [feedbackStep, setFeedbackStep] = useState<'REASON' | 'SELECT_ITEMS'>('REASON');
@@ -45,256 +36,270 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
   const [selectedTargetItems, setSelectedTargetItems] = useState<number[]>([]);
 
   const sheetPanY = useRef(new Animated.Value(height)).current;
-  
-  // UX DETAYI: LIKE Butonu Kalp Atış Animasyonu
   const likeScale = useRef(new Animated.Value(1)).current;
 
-  const openFeedbackModal = () => {
-    setFeedbackVisible(true);
-    Animated.spring(sheetPanY, { 
-      toValue: 0, 
-      bounciness: 4, 
-      useNativeDriver: true 
-    }).start();
-  };
-
-  const closeFeedbackModal = () => {
-    Animated.timing(sheetPanY, { 
-      toValue: height, 
-      duration: 250, 
-      useNativeDriver: true 
-    }).start(() => {
-      setFeedbackVisible(false);
-      setTimeout(() => {
-        setFeedbackStep('REASON');
-        setSelectedTargetItems([]);
-      }, 100); 
-    });
-  };
-
-  const feedbackPanResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gesture) => gesture.dy > 10 && gesture.vy > 0.1, 
-      onPanResponderMove: (_, gesture) => {
-        if (gesture.dy > 0) {
-          sheetPanY.setValue(gesture.dy); 
-        }
-      },
-      onPanResponderRelease: (_, gesture) => {
-        if (gesture.dy > height * 0.25 || gesture.vy > 1.2) {
-          closeFeedbackModal();
-        } else {
-          Animated.spring(sheetPanY, { toValue: 0, bounciness: 4, useNativeDriver: true }).start();
-        }
-      }
-    })
-  ).current;
-
-  const fetchOutfitFromAPI = async (blueprintIndex: number) => {
+  const fetchOutfitFromAPI = async (currentSlots: {id: string, category: string}[]) => {
+    if (currentSlots.length === 0) return;
     setIsLoading(true);
     try {
-      const response = await apiClient.get(`/outfits/suggest?userId=${CURRENT_USER_ID}&blueprintIndex=${blueprintIndex}`);
+      const requestedCategories = currentSlots.map(s => s.category).join(',');
+      const response = await apiClient.get(`/outfits/suggest?userId=${CURRENT_USER_ID}&categories=${requestedCategories}`);
       
       if (response.status === 200 && Array.isArray(response.data)) {
-        const formattedData = response.data.map((item: any) => ({
-          id: (item.id || item.clothingId || item.itemId || "").toString(),
-          uri: item.imageUrl || item.uri, 
-          category: item.category
-        }));
-        setCurrentOutfit(formattedData.filter(item => item.id !== ""));
+        const newSuggested: any = {};
+        
+        // 🚀 DÜZELTME: Kategori Eşleştirme Motoru (Python henüz hazır olmadığı için Defensive Programming)
+        let availableItems = [...response.data];
+
+        currentSlots.forEach((slot) => {
+            // Python'dan gelen listede, slotun kategorisiyle eşleşen ilk ürünü bul
+            const matchIndex = availableItems.findIndex(item => 
+                (item.category || '').toUpperCase() === slot.category.toUpperCase()
+            );
+
+            if (matchIndex !== -1) {
+                const matched = availableItems[matchIndex];
+                newSuggested[slot.id] = {
+                    id: matched.id?.toString() || matched.clothingId?.toString(),
+                    uri: matched.imageUrl || matched.uri,
+                    category: matched.category
+                };
+                availableItems.splice(matchIndex, 1); // Kullanılanı listeden çıkar
+            } 
+            // Eşleşme yoksa o slota zorla yanlış eşya (örn: T-shirt) KOYMA. Boş kalsın.
+        });
+        
+        setSuggestedItems(newSuggested);
       }
     } catch (error: any) {
-      console.error("🚨 Java Kombin Getirme Hatası:", error.response?.data || error.message);
-      setCurrentOutfit([]);
+      console.error("🚨 AI Kombin Getirme Hatası:", error.response?.data || error.message);
     } finally {
       setTimeout(() => setIsLoading(false), 300); 
     }
   };
 
   useEffect(() => {
-    fetchOutfitFromAPI(activeBlueprintIndex);
+    fetchOutfitFromAPI(dynamicSlots);
   }, []);
 
-  const handleBlueprintChange = (index: 0 | 1 | 2) => {
-    if (index !== activeBlueprintIndex) {
-      setActiveBlueprintIndex(index);
-      fetchOutfitFromAPI(index); 
-    }
+  const addSlot = (category: string) => {
+    const newSlot = { id: `slot_${category.toLowerCase()}_${Date.now()}`, category };
+    const updatedSlots = [...dynamicSlots, newSlot];
+    setDynamicSlots(updatedSlots);
+    setIsAddMenuVisible(false);
+    fetchOutfitFromAPI(updatedSlots);
   };
+
+  const removeSlot = (slotId: string) => {
+    const updatedSlots = dynamicSlots.filter(slot => slot.id !== slotId);
+    setDynamicSlots(updatedSlots);
+    const newSuggested = {...suggestedItems};
+    delete newSuggested[slotId];
+    setSuggestedItems(newSuggested);
+    fetchOutfitFromAPI(updatedSlots);
+  };
+
+  // Feedback Animasyonları
+  const openFeedbackModal = () => {
+    setFeedbackVisible(true);
+    Animated.spring(sheetPanY, { toValue: 0, bounciness: 4, useNativeDriver: true }).start();
+  };
+
+  const closeFeedbackModal = () => {
+    Animated.timing(sheetPanY, { toValue: height, duration: 250, useNativeDriver: true }).start(() => {
+      setFeedbackVisible(false);
+      setTimeout(() => { setFeedbackStep('REASON'); setSelectedTargetItems([]); }, 100); 
+    });
+  };
+
+  const feedbackPanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) => gesture.dy > 10 && gesture.vy > 0.1, 
+      onPanResponderMove: (_, gesture) => { if (gesture.dy > 0) sheetPanY.setValue(gesture.dy); },
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dy > height * 0.25 || gesture.vy > 1.2) closeFeedbackModal();
+        else Animated.spring(sheetPanY, { toValue: 0, bounciness: 4, useNativeDriver: true }).start();
+      }
+    })
+  ).current;
 
   const sendFeedbackToAPI = async (feedbackType: string, reasonCode: string, targetIds: number[]) => {
-    if (currentOutfit.length === 0) return;
+     const outfitIds = Object.values(suggestedItems).map(item => parseInt(item.id, 10)).filter(id => !isNaN(id));
+     if(outfitIds.length === 0) return;
 
-    const safeOutfitItemIds = currentOutfit
-      .map(item => parseInt(item.id, 10))
-      .filter(id => !isNaN(id) && id > 0);
+     const payload = {
+       user_id: CURRENT_USER_ID, 
+       outfit_item_ids: outfitIds, 
+       feedback_type: feedbackType, 
+       reason_code: reasonCode,     
+       target_item_ids: targetIds, 
+       weather_context: weather ? `${weather.city}, ${weather.temp}` : "UNKNOWN"
+     };
 
-    const safeTargetIds = targetIds
-      .map(id => parseInt(id.toString(), 10))
-      .filter(id => !isNaN(id) && id > 0);
-
-    const weatherString = weather && weather.temp !== '--°C' 
-        ? `${weather.city}, ${weather.temp}, ${weather.icon}` 
-        : "UNKNOWN_WEATHER";
-
-    const payload = {
-      user_id: CURRENT_USER_ID, 
-      outfit_item_ids: safeOutfitItemIds, 
-      feedback_type: feedbackType, 
-      reason_code: reasonCode,     
-      target_item_ids: safeTargetIds, 
-      weather_context: weatherString
-    };
-
-    try {
-      await apiClient.post('/feedback', payload);
-      console.log(`✅ Feedback İletildi: [${feedbackType}] Sebep: ${reasonCode}`);
-    } catch (error: any) {
-      console.error("🚨 Java API Feedback Hatası:", error.response?.data || error.message);
-    }
+     try {
+       await apiClient.post('/feedback', payload);
+     } catch (error) {
+       console.error("🚨 Feedback Hatası:", error);
+     }
   };
 
-// 🚀 GÜNCELLENMİŞ OUTFIT KAYDETME MOTORU
-  const saveOutfitToDatabase = async (outfitItems: any[]) => {
-    if (outfitItems.length === 0) return;
-    try {
-      const safeItemIds = outfitItems
-        .map(item => parseInt(item.id, 10))
-        .filter(id => !isNaN(id) && id > 0);
-
-      // 📦 Java DTO'sunun tam olarak beklediği paket (name ve clothingItemIds)
-      const payload = {
-        name: `AI Suggestion - ${new Date().toLocaleDateString('tr-TR')}`, // Java isim bekliyor!
-        clothingItemIds: safeItemIds, 
-      };
-
-      // 📍 Java'nın beklediği tam adres: /outfits/{userId}/save
-      await apiClient.post(`/outfits/${CURRENT_USER_ID}/save`, payload);
-      console.log("✨ Kombin dolaba başarıyla kaydedildi!");
-    } catch (error: any) {
-      console.error("🚨 Kombin kaydedilirken hata:", error.message);
-    }
-  }
-
   const handleReasonSelect = (reasonId: string) => {
-    const requiresItemSelection = [
-      'DONT_PAIR_THESE',        
-      'TOO_WARM_FOR_WEATHER',   
-      'TOO_COOL_FOR_WEATHER',   
-      'MISMATCHED_CATEGORIES'   
-    ];
-
-    if (requiresItemSelection.includes(reasonId)) {
+    const requiresSelection = ['DONT_PAIR_THESE', 'MISMATCHED_CATEGORIES', 'TOO_WARM_FOR_WEATHER', 'TOO_COOL_FOR_WEATHER'];
+    if (requiresSelection.includes(reasonId)) {
       setSelectedReasonCode(reasonId);
-      setSelectedTargetItems([]); 
       setFeedbackStep('SELECT_ITEMS'); 
     } else {
       executeDislike(reasonId, []);
     }
   };
 
-  const toggleTargetItem = (id: string) => {
-    const numId = parseInt(id, 10);
-    if (isNaN(numId)) return;
-
-    setSelectedTargetItems(prev => 
-      prev.includes(numId) ? prev.filter(i => i !== numId) : [...prev, numId]
-    );
-  };
-
   const executeDislike = (reason: string, targets: number[]) => {
     closeFeedbackModal(); 
     sendFeedbackToAPI('DISLIKE', reason, targets); 
-    fetchOutfitFromAPI(activeBlueprintIndex); 
+    fetchOutfitFromAPI(dynamicSlots); 
   };
 
-// 🚀 GÜNCELLENMİŞ LIKE BUTONU (Premium Bildirimli)
+  const toggleTargetItem = (id: string) => {
+    const numId = parseInt(id, 10);
+    if (isNaN(numId)) return;
+    setSelectedTargetItems(prev => prev.includes(numId) ? prev.filter(i => i !== numId) : [...prev, numId]);
+  };
+
   const handleLike = () => {
-    // 1. Kullanıcıya "Basıldı" hissi vermek için kalbi şişir
     Animated.sequence([
       Animated.timing(likeScale, { toValue: 1.4, duration: 150, useNativeDriver: true }),
       Animated.timing(likeScale, { toValue: 1, duration: 150, useNativeDriver: true })
-    ]).start(() => {
-      // 2. Animasyon bitince verileri Java'ya gönder
-      sendFeedbackToAPI('LIKE', 'NONE', []); 
-      saveOutfitToDatabase(currentOutfit); 
-      
-      // 3. Eski çirkin Alert YERİNE, Premium Bildirim şalterini aç!
-      setToastVisible(true);
-      
-      // 4. Kullanıcıyı hiç bekletmeden otomatik olarak yeni kombini çek!
-      fetchOutfitFromAPI(activeBlueprintIndex);
+    ]).start(async () => {
+      const outfitIds = Object.values(suggestedItems).map(item => parseInt(item.id, 10)).filter(id => !isNaN(id));
+      if(outfitIds.length > 0) {
+          sendFeedbackToAPI('LIKE', 'NONE', []); 
+          try {
+             await apiClient.post(`/outfits/${CURRENT_USER_ID}/save`, {
+               name: `AI Match - ${new Date().toLocaleDateString('tr-TR')}`, 
+               clothingItemIds: outfitIds 
+             });
+             setToastVisible(true);
+             fetchOutfitFromAPI(dynamicSlots);
+          } catch(e) {}
+      }
     });
   };
 
-  const currentPositions = getCollagePositions(currentOutfit.length);
+  const currentOutfitArray = dynamicSlots.map(slot => suggestedItems[slot.id]).filter(Boolean);
 
   return (
-    <View style={styles.aiTabContainer}>
+    <View style={styles.container}>
       
-      <View style={styles.aiTitleWrap}>
-        <Text style={styles.aiTitleEmoji}>🦋</Text>
-        <Text style={styles.aiTitleText}>Tell us which outfits you love</Text>
-        <Text style={styles.aiTitleEmoji}>🦋</Text>
-      </View>
-
-      <View style={styles.premiumPillWrapper}>
-        <View style={styles.premiumPill}>
-          <TouchableOpacity style={[styles.pillBtn, activeBlueprintIndex === 0 && styles.pillBtnActive]} onPress={() => handleBlueprintChange(0)}>
-            <MaterialCommunityIcons name="layers-outline" size={20} color={activeBlueprintIndex === 0 ? "#1A1A1A" : "#C0C0C0"} />
-            {activeBlueprintIndex === 0 && <Text style={styles.pillTextActive}>Basic</Text>}
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.pillBtn, activeBlueprintIndex === 1 && styles.pillBtnActive]} onPress={() => handleBlueprintChange(1)}>
-            <MaterialCommunityIcons name="account-outline" size={22} color={activeBlueprintIndex === 1 ? "#1A1A1A" : "#C0C0C0"} />
-            {activeBlueprintIndex === 1 && <Text style={styles.pillTextActive}>Full</Text>}
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.pillBtn, activeBlueprintIndex === 2 && styles.pillBtnActive]} onPress={() => handleBlueprintChange(2)}>
-            <MaterialCommunityIcons name="layers-triple-outline" size={20} color={activeBlueprintIndex === 2 ? "#1A1A1A" : "#C0C0C0"} />
-            {activeBlueprintIndex === 2 && <Text style={styles.pillTextActive}>Layered</Text>}
-          </TouchableOpacity>
+      <TouchableOpacity style={styles.eventBanner} activeOpacity={0.8}>
+        <View style={styles.eventBannerContent}>
+          <Feather name="star" size={20} color={COLORS.accent} />
+          <Text style={styles.eventBannerText}>Özel bir etkinliğe mi hazırlanıyorsun? ✨</Text>
         </View>
-      </View>
+        <Feather name="chevron-right" size={20} color={COLORS.primary} />
+      </TouchableOpacity>
 
-      <View style={styles.aiOutfitGrid}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        
+        <View style={styles.headerRow}>
+           <View>
+             <Text style={styles.infoTitle}>Dinamik Kapsül</Text>
+             <Text style={styles.infoDesc}>Slotları belirle, yapay zeka kombinlesin.</Text>
+           </View>
+           <TouchableOpacity 
+             style={styles.viewToggleBtn} 
+             onPress={() => setIsThreeColView(!isThreeColView)}
+           >
+             <MaterialCommunityIcons 
+               name={isThreeColView ? "view-grid-outline" : "view-grid"} 
+               size={24} 
+               color={COLORS.primary} 
+             />
+           </TouchableOpacity>
+        </View>
+
         {isLoading ? (
-           <ActivityIndicator size="large" color="#CCFF00" style={{ marginTop: 100 }} />
-        ) : currentOutfit.length === 0 ? (
-           <Text style={styles.emptyText}>Bu şablona uygun eşya bulunamadı.</Text>
+            <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 80 }} />
+        ) : dynamicSlots.length === 0 ? (
+            <View style={styles.emptyContainer}>
+               <Feather name="layers" size={40} color={COLORS.textSecondary} />
+               <Text style={styles.emptyText}>Henüz bir slot eklemediniz.</Text>
+            </View>
         ) : (
-           currentOutfit.map((item, index) => {
-             const posStyle = currentPositions[index % currentPositions.length]; 
-             return (
-               <View key={`${item.id}-${index}`} style={[styles.dynamicItemContainer, posStyle as any]}>
-                 <Image source={{ uri: item.uri }} style={styles.dynamicItemImage} />
-               </View>
-             );
-           })
-        )}
-      </View>
+            <View style={styles.gridContainer}>
+              {dynamicSlots.map((slot) => {
+                 const item = suggestedItems[slot.id];
+                 return (
+                     <View key={slot.id} style={isThreeColView ? styles.threeColCard : styles.twoColCard}>
+                         <View style={styles.rowHeader}>
+                             <Text style={[styles.rowCategory, isThreeColView && { fontSize: 9 }]} numberOfLines={1}>
+                               {slot.category}
+                             </Text>
+                             <TouchableOpacity onPress={() => removeSlot(slot.id)} style={styles.removeBtn}>
+                                 <Feather name="trash-2" size={isThreeColView ? 14 : 16} color={COLORS.error} />
+                             </TouchableOpacity>
+                         </View>
 
-      <View style={styles.aiActionRow}>
-         <TouchableOpacity style={styles.aiActionBtnDislike} onPress={openFeedbackModal} activeOpacity={0.8}>
-           <Feather name="x" size={32} color="#FF3B30" />
+                         <View style={[styles.suggestedItemBox, isThreeColView && { height: height * 0.11 }]}>
+                             {item ? (
+                                 <Image source={{ uri: item.uri }} style={styles.itemImage} />
+                             ) : (
+                                 <Text style={[styles.noItemText, isThreeColView && { fontSize: 9 }]}>Eşya yok</Text>
+                             )}
+                         </View>
+                     </View>
+                 );
+              })}
+            </View>
+        )}
+
+        <TouchableOpacity style={styles.addSlotBtn} activeOpacity={0.8} onPress={() => setIsAddMenuVisible(true)}>
+           <Feather name="plus" size={22} color={COLORS.text} />
+           <Text style={styles.addSlotText}>Kategori Ekle</Text>
+        </TouchableOpacity>
+
+      </ScrollView>
+
+      {/* FLOATİNG AKSİYON BÖLGESİ */}
+      <View style={styles.floatingActionArea}>
+         <TouchableOpacity style={styles.actionBtnDislike} onPress={openFeedbackModal} activeOpacity={0.8}>
+           <Feather name="x" size={28} color={COLORS.error} />
          </TouchableOpacity>
          
-         <TouchableOpacity style={styles.aiActionBtnNext} onPress={() => fetchOutfitFromAPI(activeBlueprintIndex)} activeOpacity={0.7}>
-           <MaterialCommunityIcons name="butterfly-outline" size={36} color="#1A1A1A" />
-           <Text style={styles.aiNextText}>Next Outfit</Text>
+         <TouchableOpacity style={styles.actionBtnRefresh} onPress={() => fetchOutfitFromAPI(dynamicSlots)} activeOpacity={0.7}>
+           <MaterialCommunityIcons name="butterfly-outline" size={32} color="#FFF" />
+           <Text style={styles.refreshText}>Yenile</Text>
          </TouchableOpacity>
          
-         <TouchableOpacity style={styles.aiActionBtnLike} onPress={handleLike} activeOpacity={0.9}>
-           {/* 🚀 ANİMASYONLU KALP */}
+         <TouchableOpacity style={styles.actionBtnLike} onPress={handleLike} activeOpacity={0.9}>
            <Animated.View style={{ transform: [{ scale: likeScale }] }}>
-             <MaterialCommunityIcons name="heart" size={32} color="#34C759" />
+             <MaterialCommunityIcons name="heart" size={28} color={COLORS.primary} />
            </Animated.View>
          </TouchableOpacity>
       </View>
 
-      {/* 🛑 KAYDIRILABİLİR BOTTOM SHEET (MODAL) */}
+      {/* 1. KATEGORİ MODALI */}
+      <Modal visible={isAddMenuVisible} transparent={true} animationType="slide">
+        <View style={styles.modalOverlay}>
+           <View style={styles.categoryMenu}>
+               <Text style={styles.categoryMenuTitle}>Hangi kategoriyi eklemek istersin?</Text>
+               <View style={styles.categoryGrid}>
+                 {AVAILABLE_CATEGORIES.map(cat => (
+                    <TouchableOpacity key={cat} style={styles.categoryGridItem} onPress={() => addSlot(cat)}>
+                        <Text style={styles.categoryGridText}>{cat}</Text>
+                    </TouchableOpacity>
+                 ))}
+               </View>
+               <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setIsAddMenuVisible(false)}>
+                  <Text style={styles.modalCancelText}>Kapat</Text>
+               </TouchableOpacity>
+           </View>
+        </View>
+      </Modal>
+
+      {/* 2. GERİBİLDİRİM MODALI */}
       <Modal visible={isFeedbackVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={closeFeedbackModal} />
-          
           <Animated.View style={[styles.bottomSheet, { transform: [{ translateY: sheetPanY }] }]}>
             <View style={{ width: '100%', paddingVertical: 10 }} {...feedbackPanResponder.panHandlers}>
               <View style={styles.sheetHandle} />
@@ -302,25 +307,23 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
 
             {feedbackStep === 'REASON' && (
               <>
-                <Text style={styles.sheetSubtitle}>Don't like this recommendation?</Text>
-                <Text style={styles.sheetTitle}>Please select the reason you don't like this</Text>
-                
+                <Text style={styles.sheetTitle}>Neden beğenmediniz?</Text>
                 <ScrollView style={{ marginTop: 10 }} showsVerticalScrollIndicator={false}>
                   {[
-                    { id: 'MISMATCHED_CATEGORIES', label: 'Mismatched categories' },
-                    { id: 'COLOR_MISMATCH', label: "I don't like the color match" },
-                    { id: 'TOO_COOL_FOR_WEATHER', label: 'I want a warmer outfit' },
-                    { id: 'TOO_WARM_FOR_WEATHER', label: 'I want a cooler outfit' },
-                    { id: 'DONT_PAIR_THESE', label: 'There are item(s) I want to exclude from my suggestions' }
+                    { id: 'MISMATCHED_CATEGORIES', label: 'Parçalar birbiriyle uyumsuz' },
+                    { id: 'COLOR_MISMATCH', label: "Renk uyumunu beğenmedim" },
+                    { id: 'TOO_COOL_FOR_WEATHER', label: 'Hava durumuna göre çok ince' },
+                    { id: 'TOO_WARM_FOR_WEATHER', label: 'Hava durumuna göre çok kalın' },
+                    { id: 'DONT_PAIR_THESE', label: 'Belirli parçaları birlikte önerme' }
                   ].map(opt => (
                     <TouchableOpacity key={opt.id} style={styles.feedbackOptionRow} onPress={() => handleReasonSelect(opt.id)}>
                       <Text style={styles.feedbackOptionText}>{opt.label}</Text>
-                      <Feather name="chevron-right" size={20} color="#C0C0C0" />
+                      <Feather name="chevron-right" size={20} color={COLORS.border} />
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
-                <TouchableOpacity style={styles.cancelFeedbackBtn} onPress={closeFeedbackModal}>
-                  <Text style={styles.cancelFeedbackText}>Cancel</Text>
+                <TouchableOpacity style={styles.modalCancelBtn} onPress={closeFeedbackModal}>
+                  <Text style={styles.modalCancelText}>Vazgeç</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -328,17 +331,18 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
             {feedbackStep === 'SELECT_ITEMS' && (
               <>
                 <Text style={styles.sheetTitle}>
-                  {selectedReasonCode === 'TOO_WARM_FOR_WEATHER' ? "Select items that are too warm" :
-                   selectedReasonCode === 'TOO_COOL_FOR_WEATHER' ? "Select items that are too cool" :
-                   selectedReasonCode === 'MISMATCHED_CATEGORIES' ? "Select the mismatched items" :
-                   "Select items to exclude"}
+                  {selectedReasonCode === 'TOO_WARM_FOR_WEATHER' ? "Fazla kalın olan parçaları seçin" :
+                   selectedReasonCode === 'TOO_COOL_FOR_WEATHER' ? "Fazla ince olan parçaları seçin" :
+                   selectedReasonCode === 'MISMATCHED_CATEGORIES' ? "Uyumsuz bulduğunuz parçaları seçin" :
+                   "Önerilmesini istemediğiniz parçaları seçin"}
                 </Text>
                 <Text style={styles.sheetSubtitle}>
-                  The selected clothes will be adjusted according to your feedback.
+                  Seçtiğiniz eşyalar Vestify zeka motoruna öğretilecek.
                 </Text>
                 
                 <ScrollView contentContainerStyle={styles.selectionGrid} showsVerticalScrollIndicator={false}>
-                  {currentOutfit.map(item => {
+                  {currentOutfitArray.map(item => {
+                    if (!item) return null;
                     const isSelected = selectedTargetItems.includes(parseInt(item.id, 10));
                     return (
                       <TouchableOpacity 
@@ -361,7 +365,7 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
                   disabled={selectedTargetItems.length === 0}
                   onPress={() => executeDislike(selectedReasonCode, selectedTargetItems)}
                 >
-                  <Text style={styles.doneBtnText}>Done</Text>
+                  <Text style={styles.doneBtnText}>Tamamla ve Yenile</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -370,54 +374,73 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
         </View>
       </Modal>
 
-      <PremiumToast // Bildirim Toast bildirimi
-        visible={toastVisible} 
-        message="Outfit saved 🦋" 
-        onHide={() => setToastVisible(false)} 
-      />
+      <PremiumToast visible={toastVisible} message="Kombin dolaba eklendi! 🦋" onHide={() => setToastVisible(false)} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  aiTabContainer: { flex: 1, backgroundColor: '#FAFAFA', alignItems: 'center' },
-  aiTitleWrap: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#EBE8DF', paddingBottom: 15, marginTop: 15, width: '85%', justifyContent: 'center', gap: 10 },
-  aiTitleEmoji: { fontSize: 18 },
-  aiTitleText: { fontSize: 18, fontWeight: '500', color: '#1A1A1A' },
-  premiumPillWrapper: { width: '100%', alignItems: 'center', marginTop: 15, zIndex: 50 },
-  premiumPill: { flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 30, padding: 5, shadowColor: '#000', shadowOffset: {width: 0, height: 8}, shadowOpacity: 0.08, shadowRadius: 15, elevation: 10 },
-  pillBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 25, gap: 8 },
-  pillBtnActive: { backgroundColor: '#CCFF00', shadowColor: '#CCFF00', shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.3, shadowRadius: 8 },
-  pillTextActive: { fontSize: 13, fontWeight: '700', color: '#1A1A1A' },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  scrollContent: { paddingBottom: 150, paddingTop: 10 },
   
-  aiOutfitGrid: { flex: 1, width: '100%', marginTop: 10, position: 'relative' },
-  dynamicItemContainer: { position: 'absolute', justifyContent: 'center', alignItems: 'center' },
-  dynamicItemImage: { width: '100%', height: '100%', resizeMode: 'contain' },
-  
-  emptyText: { color: '#888', marginTop: 100, fontSize: 14, fontWeight: '500', alignSelf: 'center' },
-  
-  aiActionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingBottom: 40, gap: 40 },
-  aiActionBtnDislike: { backgroundColor: '#FFF5F5', width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', shadowColor: '#FF3B30', shadowOffset: {width:0, height:4}, shadowOpacity: 0.2, shadowRadius: 8, elevation: 5 },
-  aiActionBtnLike: { backgroundColor: '#F0FFF4', width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', shadowColor: '#34C759', shadowOffset: {width:0, height:4}, shadowOpacity: 0.2, shadowRadius: 8, elevation: 5 },
-  aiActionBtnNext: { alignItems: 'center', justifyContent: 'center', marginTop: 10 },
-  aiNextText: { fontSize: 12, color: '#1A1A1A', fontWeight: '700', marginTop: 8 },
-  
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  bottomSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingHorizontal: 25, paddingBottom: 40, maxHeight: height * 0.8, shadowColor: '#000', shadowOffset: { width: 0, height: -5 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 20 },
-  sheetHandle: { width: 50, height: 6, backgroundColor: '#E0E0E0', borderRadius: 3, alignSelf: 'center' },
-  sheetSubtitle: { fontSize: 13, color: '#888', textAlign: 'center', fontWeight: '500', marginBottom: 5 },
-  sheetTitle: { fontSize: 18, color: '#1A1A1A', textAlign: 'center', fontWeight: '700', marginBottom: 25 },
-  feedbackOptionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: '#F5F5F5' },
-  feedbackOptionText: { fontSize: 15, color: '#333', fontWeight: '500' },
-  cancelFeedbackBtn: { marginTop: 15, paddingVertical: 15, alignItems: 'center', backgroundColor: '#F5F5F5', borderRadius: 12 },
-  cancelFeedbackText: { fontSize: 16, fontWeight: '700', color: '#1A1A1A' },
+  eventBanner: { alignSelf: 'center', width: '90%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: COLORS.surface, marginTop: 5, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.light },
+  eventBannerContent: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  eventBannerText: { fontSize: 14, fontWeight: '700', color: COLORS.text },
 
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 25, marginTop: 25, marginBottom: 15 },
+  infoTitle: { fontSize: 18, fontWeight: '800', color: COLORS.text },
+  infoDesc: { fontSize: 12, color: COLORS.textSecondary, marginTop: 4 },
+  viewToggleBtn: { backgroundColor: COLORS.surface, padding: 8, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.light },
+
+  // 🚀 IZGARA SİSTEMİ
+  gridContainer: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 15, justifyContent: 'flex-start', gap: '3%' },
+  
+  twoColCard: { width: '48%', backgroundColor: COLORS.surface, borderRadius: 20, marginBottom: 15, padding: 12, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.light },
+  threeColCard: { width: '31%', backgroundColor: COLORS.surface, borderRadius: 16, marginBottom: 12, padding: 8, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.light },
+  
+  rowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, borderBottomWidth: 1, borderBottomColor: COLORS.background, paddingBottom: 6 },
+  rowCategory: { fontSize: 11, fontWeight: '800', color: COLORS.primary, letterSpacing: 0.5, flex: 1 },
+  removeBtn: { padding: 2 },
+  
+  suggestedItemBox: { width: '100%', height: height * 0.16, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background, borderRadius: 12 },
+  itemImage: { width: '80%', height: '90%', resizeMode: 'contain' },
+  noItemText: { fontSize: 11, color: COLORS.textSecondary, fontStyle: 'italic', textAlign: 'center' },
+
+  addSlotBtn: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surface, paddingVertical: 12, paddingHorizontal: 25, borderRadius: 25, marginTop: 10, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.light, gap: 8 },
+  addSlotText: { fontSize: 14, fontWeight: '700', color: COLORS.text },
+
+  emptyContainer: { alignItems: 'center', marginTop: 80 },
+  emptyText: { marginTop: 15, fontSize: 15, color: COLORS.textSecondary, fontWeight: '500' },
+
+  floatingActionArea: { position: 'absolute', bottom: 30, width: '100%', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 30 },
+  actionBtnDislike: { backgroundColor: COLORS.surface, width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', ...SHADOWS.medium },
+  actionBtnLike: { backgroundColor: COLORS.surface, width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', ...SHADOWS.medium },
+  actionBtnRefresh: { backgroundColor: COLORS.primary, width: 80, height: 80, borderRadius: 40, justifyContent: 'center', alignItems: 'center', ...SHADOWS.medium },
+  refreshText: { color: '#FFF', fontSize: 11, fontWeight: '700', marginTop: 4 },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(74, 46, 27, 0.4)', justifyContent: 'flex-end', alignItems: 'center' },
+  categoryMenu: { backgroundColor: COLORS.surface, width: '90%', borderRadius: 24, padding: 25, alignItems: 'center', marginBottom: height * 0.3, ...SHADOWS.medium },
+  categoryMenuTitle: { fontSize: 16, fontWeight: '800', color: COLORS.text, marginBottom: 20 },
+  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10 },
+  categoryGridItem: { paddingVertical: 10, paddingHorizontal: 16, backgroundColor: COLORS.background, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border },
+  categoryGridText: { fontSize: 13, fontWeight: '700', color: COLORS.text },
+  modalCancelBtn: { marginTop: 20, paddingVertical: 12, width: '100%', alignItems: 'center', backgroundColor: COLORS.background, borderRadius: 12 },
+  modalCancelText: { fontSize: 15, fontWeight: '700', color: COLORS.text },
+
+  bottomSheet: { backgroundColor: COLORS.surface, borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingHorizontal: 25, paddingBottom: 40, width: '100%', maxHeight: height * 0.8, ...SHADOWS.medium },
+  sheetHandle: { width: 50, height: 5, backgroundColor: COLORS.border, borderRadius: 3, alignSelf: 'center' },
+  sheetTitle: { fontSize: 18, color: COLORS.text, textAlign: 'center', fontWeight: '800', marginBottom: 5 },
+  sheetSubtitle: { fontSize: 13, color: COLORS.textSecondary, textAlign: 'center', fontWeight: '500', marginBottom: 20 },
+  feedbackOptionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: COLORS.background },
+  feedbackOptionText: { fontSize: 15, color: COLORS.text, fontWeight: '600' },
+  
   selectionGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginTop: 10 },
-  selectionCard: { width: '48%', backgroundColor: '#FAFAFA', borderRadius: 12, padding: 10, marginBottom: 15, position: 'relative', height: 140, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: 'transparent' },
-  selectionCardActive: { borderColor: '#FF6B81', backgroundColor: '#FFF0F2' },
+  selectionCard: { width: '48%', backgroundColor: COLORS.background, borderRadius: 12, padding: 10, marginBottom: 15, position: 'relative', height: 140, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: 'transparent' },
+  selectionCardActive: { borderColor: COLORS.error, backgroundColor: '#FDF7F7' },
   selectionImage: { width: '80%', height: '80%', resizeMode: 'contain' },
-  checkboxIcon: { position: 'absolute', top: 10, left: 10, width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#E0E0E0', justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' },
-  checkboxIconActive: { backgroundColor: '#FF6B81', borderColor: '#FF6B81' },
-  doneBtn: { backgroundColor: '#1A1A1A', paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginTop: 20 },
+  checkboxIcon: { position: 'absolute', top: 10, left: 10, width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: COLORS.border, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.surface },
+  checkboxIconActive: { backgroundColor: COLORS.error, borderColor: COLORS.error },
+  
+  doneBtn: { backgroundColor: COLORS.primary, paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginTop: 20 },
   doneBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' }
 });
