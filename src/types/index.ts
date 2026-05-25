@@ -35,3 +35,37 @@ export interface AiExtractionResponse {
   message: string;
   saved_urls?: string[];
 }
+
+// --- VESTIFY CAPSULE ENGINE TYPES ---
+
+export interface CapsuleOutfit {
+  outfitName: string;
+  userItems: string[]; // Backend'den ID listesi dönüyor ("94", "86" vb.)
+  partnerUpsellItem: string; // Partner ürün ID'si
+  stylistPitch: string; // Yapay zekanın yazdığı elit pazarlama metni
+}
+
+export interface CapsuleResponse { // backend'den uygulamaya
+  capsuleTitle: string;
+  coreCapsuleItemIds: string[];
+  outfits: CapsuleOutfit[];
+}
+
+export interface CapsuleRequest { // uygulamadan backend'e
+  userId: string;
+  mode: string;
+  target: string;
+  date: string;
+  temperature: string;
+  tripPurpose: string;
+}
+
+// Partner (Mağaza) Ürünleri için Type (İleride genişleteceğiz)
+export interface PartnerItem {
+  id: string;
+  brand: string;
+  name: string;
+  price: string;
+  category: string;
+  imageUrl?: string; // Uygulamada göstermek için ileride ekleyeceğiz
+}
