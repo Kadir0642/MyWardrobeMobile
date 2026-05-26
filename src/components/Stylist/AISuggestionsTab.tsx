@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Image, Modal, ScrollView, Dimensions, ActivityIndicator, Animated, PanResponder, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Image, Modal, ScrollView, Dimensions, ActivityIndicator, Animated, PanResponder } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native'; // 🚀 Navigasyon için gerekli
 import PremiumToast from '../PremiumToast';
 import { apiClient } from '../../api/client';
 import { COLORS, SHADOWS } from '../../theme/theme'; 
@@ -17,7 +17,7 @@ interface AISuggestionsTabProps {
 }
 
 export default function AISuggestionsTab({ allWardrobe = [], weather }: AISuggestionsTabProps) {
-  const navigation = useNavigation<any>(); 
+  const navigation = useNavigation<any>(); // 🚀 Navigasyon motorunu başlattık
 
   const [dynamicSlots, setDynamicSlots] = useState<{id: string, category: string}[]>([
     { id: `slot_tops_${Date.now()}`, category: 'TOPS' },
@@ -28,9 +28,9 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
   const [suggestedItems, setSuggestedItems] = useState<{ [slotId: string]: {id: string, uri: string, category: string} }>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isAddMenuVisible, setIsAddMenuVisible] = useState(false);
-  
   const [isThreeColView, setIsThreeColView] = useState(false);
   
+  // ⚡ BİLDİRİM VE FEEDBACK STATE'LERİ (Kritik Koruma Kalkanı - Aynen Duruyor)
   const [toastVisible, setToastVisible] = useState(false);
   const [isFeedbackVisible, setFeedbackVisible] = useState(false);
   const [feedbackStep, setFeedbackStep] = useState<'REASON' | 'SELECT_ITEMS'>('REASON');
@@ -61,6 +61,7 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
   const sheetPanY = useRef(new Animated.Value(height)).current;
   const likeScale = useRef(new Animated.Value(1)).current;
 
+  // AI Motoru Bağlantısı (Kategori Eşleştirme Sistemi)
   const fetchOutfitFromAPI = async (currentSlots: {id: string, category: string}[]) => {
     if (currentSlots.length === 0) return;
     setIsLoading(true);
@@ -116,7 +117,7 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
     fetchOutfitFromAPI(updatedSlots);
   };
 
-  // Feedback Animasyonları ve Mekanizması
+  // ⚡ Feedback Animasyonları ve Mekanizmaları (Kesinlikle Dokunulmadı!)
   const openFeedbackModal = () => {
     setFeedbackVisible(true);
     Animated.spring(sheetPanY, { toValue: 0, bounciness: 4, useNativeDriver: true }).start();
@@ -198,40 +199,16 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
     });
   };
 
-// 🚀 GÜNCELLENMİŞ: MELEZ FORM GÖNDERME MANTIĞI
-  const handleEventSubmit = () => {
-    let finalContext = '';
-    
-    // 1. Öncelik: Eğer Sihirli Kutu'ya bir şey yazıldıysa, direkt onu al
-    if (customPrompt.trim().length > 0) {
-      finalContext = customPrompt.trim();
-    } 
-    // 2. Öncelik: Eğer kutu boşsa, butonlardan seçilenleri birleştir
-    else if (selectedEvent && selectedVibe) {
-      const eventLabel = EVENT_TYPES.find(e => e.id === selectedEvent)?.label;
-      const vibeLabel = VIBE_TYPES.find(v => v.id === selectedVibe)?.label;
-      finalContext = `${eventLabel} konseptinde, ${vibeLabel} tarzında bir görünüm`;
-    } 
-    // Hiçbiri yoksa uyar
-    else {
-      alert("Lütfen butonlardan seçim yapın veya Sihirli Kutu'ya ne istediğinizi yazın.");
-      return;
-    }
-
-    setEventModalVisible(false); // Modalı kapat
-    
-    // 🚀 MİMARİ HAMLE: Elde ettiğimiz "Bağlamı (Context)" yeni Lüks Vitrin ekranımıza parametre olarak taşıyoruz.
-    navigation.navigate('EventResultScreen', { eventContext: finalContext });
-  };
-
   const currentOutfitArray = dynamicSlots.map(slot => suggestedItems[slot.id]).filter(Boolean);
 
   return (
     <View style={styles.container}>
       
-      {/* Yan Yana Aksiyon Vitrini (Split Cards) */}
+      {/* 🚀 Split Cards (Yan Yana Premium Banner Yapısı) */}
       <View style={styles.actionHubContainer}>
-        <TouchableOpacity style={styles.actionCard} activeOpacity={0.8} onPress={() => navigation.navigate('Planner')}>
+        
+        {/* SEYAHAT KARTI */}
+        <TouchableOpacity style={styles.actionCard} activeOpacity={0.8} onPress={() => navigation.navigate('TravelPlannerScreen')}>
           <View style={[styles.cardIconBox, { backgroundColor: COLORS.primary }]}>
             <Feather name="briefcase" size={20} color="#FFF" />
           </View>
@@ -239,22 +216,29 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
           <Text style={styles.cardSub}>Hadi bavulunu hazırlayalım</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.actionCard} activeOpacity={0.8} onPress={() => setEventModalVisible(true)}>
+        {/* ETKİNLİK KARTI */}
+        {/* 🚀 DÜZELTME: Artık modal açmıyor, doğrudan tam ekran formumuza (EventPlannerScreen) uçuruyor! */}
+        <TouchableOpacity 
+          style={styles.actionCard} 
+          activeOpacity={0.8} 
+          onPress={() => navigation.navigate('EventPlannerScreen')} 
+        >
           <View style={[styles.cardIconBox, { backgroundColor: COLORS.accent }]}>
             <Feather name="star" size={20} color={COLORS.text} />
           </View>
           <Text style={styles.cardTitle}>Özel Etkinlik ✨</Text>
           <Text style={styles.cardSub}>Kusursuz kombini bul</Text>
         </TouchableOpacity>
+        
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
+        {/* Samimi Başlık Alanı */}
         <View style={styles.headerRow}>
            <View style={styles.aiTitleWrap}>
              <Text style={styles.aiTitleEmoji}>🦋</Text>
              <Text style={styles.infoTitle}>Tell us which outfits you love</Text>
-             <Text style={styles.aiTitleEmoji}>🦋</Text>
            </View>
            <TouchableOpacity style={styles.viewToggleBtn} onPress={() => setIsThreeColView(!isThreeColView)}>
              <MaterialCommunityIcons name={isThreeColView ? "view-grid-outline" : "view-grid"} size={22} color={COLORS.primary} />
@@ -296,7 +280,7 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
 
       </ScrollView>
 
-      {/* FLOATİNG AKSİYON BÖLGESİ */}
+      {/* FLOATİNG AKSİYON BÖLGESİ (Like / Dislike / Refresh) */}
       <View style={styles.floatingActionArea}>
          <TouchableOpacity style={styles.actionBtnDislike} onPress={openFeedbackModal} activeOpacity={0.8}>
            <Feather name="x" size={28} color={COLORS.error} />
@@ -312,9 +296,8 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
          </TouchableOpacity>
       </View>
 
-      {/* 1. KATEGORİ MODALI */}
+      {/* KATEGORİ MODALI */}
       <Modal visible={isAddMenuVisible} transparent={true} animationType="slide">
-        {/* İçerik öncekiyle aynı */}
         <View style={styles.modalOverlay}>
            <View style={styles.categoryMenu}>
                <Text style={styles.categoryMenuTitle}>Hangi kategoriyi eklemek istersin?</Text>
@@ -332,10 +315,9 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
         </View>
       </Modal>
 
-      {/* 2. GERİBİLDİRİM MODALI */}
+      {/* RLHF GERİBİLDİRİM MODALI (Tamamen Korundu) */}
       <Modal visible={isFeedbackVisible} transparent animationType="fade">
-          {/* İçerik öncekiyle tamamen aynı */}
-          <View style={styles.modalOverlay}>
+        <View style={styles.modalOverlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={closeFeedbackModal} />
           <Animated.View style={[styles.bottomSheet, { transform: [{ translateY: sheetPanY }] }]}>
             <View style={{ width: '100%', paddingVertical: 10 }} {...feedbackPanResponder.panHandlers}>
@@ -373,9 +355,7 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
                    selectedReasonCode === 'MISMATCHED_CATEGORIES' ? "Uyumsuz bulduğunuz parçaları seçin" :
                    "Önerilmesini istemediğiniz parçaları seçin"}
                 </Text>
-                <Text style={styles.sheetSubtitle}>
-                  Seçtiğiniz eşyalar Vestify zeka motoruna öğretilecek.
-                </Text>
+                <Text style={styles.sheetSubtitle}>Seçtiğiniz eşyalar Vestify zeka motoruna öğretilecek.</Text>
                 
                 <ScrollView contentContainerStyle={styles.selectionGrid} showsVerticalScrollIndicator={false}>
                   {currentOutfitArray.map(item => {
@@ -411,103 +391,6 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
         </View>
       </Modal>
 
-      {/* 3. 🚀 YENİ: MELEZ ETKİNLİK (EVENT) MODALI */}
-      <Modal visible={isEventModalVisible} transparent animationType="slide">
-        {/* Klavye açıldığında formun yukarı kayması için KeyboardAvoidingView kullanıyoruz */}
-        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setEventModalVisible(false)} />
-          
-          <View style={styles.eventBottomSheet}>
-            <View style={styles.sheetHandle} />
-            
-            <View style={styles.eventHeader}>
-               <View style={styles.eventIconWrap}>
-                 <Feather name="star" size={24} color={COLORS.text} />
-               </View>
-               <Text style={styles.eventTitle}>Nereye Gidiyoruz?</Text>
-               <Text style={styles.eventSub}>Vestify AI, mekana ve konsepte en uygun parçaları seçecek.</Text>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 20 }}>
-              
-              {/* TIKLANABİLİR LÜKS BUTONLAR */}
-              <Text style={styles.eventSectionTitle}>Etkinlik Türü</Text>
-              <View style={styles.eventGrid}>
-                {EVENT_TYPES.map(evt => (
-                  <TouchableOpacity 
-                    key={evt.id} 
-                    style={[styles.eventOptionBtn, selectedEvent === evt.id && styles.eventOptionBtnActive]}
-                    onPress={() => { setSelectedEvent(evt.id); setCustomPrompt(''); /* Sihirli kutuyu temizle */ }}
-                    activeOpacity={0.7}
-                  >
-                    <Feather name={evt.icon as any} size={16} color={selectedEvent === evt.id ? COLORS.primary : COLORS.textSecondary} />
-                    <Text style={[styles.eventOptionText, selectedEvent === evt.id && styles.eventOptionTextActive]}>
-                      {evt.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <Text style={[styles.eventSectionTitle, { marginTop: 20 }]}>Yaratmak İstediğin İzlenim</Text>
-              <View style={styles.vibeGrid}>
-                {VIBE_TYPES.map(vibe => (
-                  <TouchableOpacity 
-                    key={vibe.id} 
-                    style={[styles.vibeOptionBtn, selectedVibe === vibe.id && styles.vibeOptionBtnActive]}
-                    onPress={() => { setSelectedVibe(vibe.id); setCustomPrompt(''); /* Sihirli kutuyu temizle */ }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.vibeOptionText, selectedVibe === vibe.id && styles.vibeOptionTextActive]}>
-                      {vibe.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* VEYA AYIRICI */}
-              <View style={styles.dividerContainer}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>VEYA</Text>
-                <View style={styles.dividerLine} />
-              </View>
-
-              {/* SİHİRLİ KUTU (GEMINI'YE FISILDA) */}
-              <Text style={styles.eventSectionTitle}>Sihirli Kutu ✨</Text>
-              <View style={styles.magicBoxContainer}>
-                 <Feather name="edit-3" size={20} color={COLORS.primary} style={styles.magicBoxIcon} />
-                 <TextInput
-                   style={styles.magicBoxInput}
-                   placeholder="Detayları Vestify AI'a fısılda... (Örn: Eski sevgilimin düğününe gidiyorum, çok iddialı olmalıyım)"
-                   placeholderTextColor={COLORS.textSecondary}
-                   multiline
-                   maxLength={150}
-                   value={customPrompt}
-                   onChangeText={(text) => {
-                     setCustomPrompt(text);
-                     // Sihirli kutuya yazıyorsa, buton seçimlerini sıfırla
-                     if (text.length > 0) {
-                       setSelectedEvent(null);
-                       setSelectedVibe(null);
-                     }
-                   }}
-                 />
-              </View>
-
-              <TouchableOpacity 
-                style={[styles.generateEventBtn, (!customPrompt && (!selectedEvent || !selectedVibe)) && { opacity: 0.5 }]} 
-                activeOpacity={0.8}
-                onPress={handleEventSubmit}
-                disabled={!customPrompt && (!selectedEvent || !selectedVibe)}
-              >
-                <Text style={styles.generateEventBtnText}>Kusursuz Kombinimi Bul</Text>
-                <Feather name="arrow-right" size={20} color={COLORS.text} />
-              </TouchableOpacity>
-              
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
       <PremiumToast visible={toastVisible} message="Kombin dolaba eklendi! 🦋" onHide={() => setToastVisible(false)} />
     </View>
   );
@@ -516,43 +399,34 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   scrollContent: { paddingBottom: 150, paddingTop: 10 },
-  
   actionHubContainer: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 15, paddingTop: 15 },
   actionCard: { width: '48%', backgroundColor: COLORS.surface, padding: 15, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.light },
   cardIconBox: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
   cardTitle: { fontSize: 13, fontWeight: '800', color: COLORS.text, marginBottom: 4 },
   cardSub: { fontSize: 11, color: COLORS.textSecondary, fontWeight: '600' },
-
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginTop: 25, marginBottom: 15 },
   aiTitleWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   aiTitleEmoji: { fontSize: 16 },
   infoTitle: { fontSize: 15, fontWeight: '800', color: COLORS.text },
   viewToggleBtn: { backgroundColor: COLORS.surface, padding: 8, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.light },
-
   gridContainer: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 15, justifyContent: 'flex-start', gap: '3%' },
   twoColCard: { width: '48%', backgroundColor: COLORS.surface, borderRadius: 20, marginBottom: 15, padding: 12, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.light },
   threeColCard: { width: '31%', backgroundColor: COLORS.surface, borderRadius: 16, marginBottom: 12, padding: 8, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.light },
-  
   rowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, borderBottomWidth: 1, borderBottomColor: COLORS.background, paddingBottom: 6 },
   rowCategory: { fontSize: 11, fontWeight: '800', color: COLORS.primary, letterSpacing: 0.5, flex: 1 },
   removeBtn: { padding: 2 },
-  
   suggestedItemBox: { width: '100%', height: height * 0.16, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background, borderRadius: 12 },
   itemImage: { width: '80%', height: '90%', resizeMode: 'contain' },
   noItemText: { fontSize: 11, color: COLORS.textSecondary, fontStyle: 'italic', textAlign: 'center' },
-
   addSlotBtn: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surface, paddingVertical: 12, paddingHorizontal: 25, borderRadius: 25, marginTop: 10, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.light, gap: 8 },
   addSlotText: { fontSize: 14, fontWeight: '700', color: COLORS.text },
-
   emptyContainer: { alignItems: 'center', marginTop: 80 },
   emptyText: { marginTop: 15, fontSize: 15, color: COLORS.textSecondary, fontWeight: '500' },
-
   floatingActionArea: { position: 'absolute', bottom: 30, width: '100%', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 30 },
   actionBtnDislike: { backgroundColor: COLORS.surface, width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', ...SHADOWS.medium },
   actionBtnLike: { backgroundColor: COLORS.surface, width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', ...SHADOWS.medium },
   actionBtnRefresh: { backgroundColor: COLORS.primary, width: 80, height: 80, borderRadius: 40, justifyContent: 'center', alignItems: 'center', ...SHADOWS.medium },
   refreshText: { color: '#FFF', fontSize: 11, fontWeight: '700', marginTop: 4 },
-
   modalOverlay: { flex: 1, backgroundColor: 'rgba(74, 46, 27, 0.4)', justifyContent: 'flex-end', alignItems: 'center' },
   categoryMenu: { backgroundColor: COLORS.surface, width: '90%', borderRadius: 24, padding: 25, alignItems: 'center', marginBottom: height * 0.3, ...SHADOWS.medium },
   categoryMenuTitle: { fontSize: 16, fontWeight: '800', color: COLORS.text, marginBottom: 20 },
@@ -561,14 +435,12 @@ const styles = StyleSheet.create({
   categoryGridText: { fontSize: 13, fontWeight: '700', color: COLORS.text },
   modalCancelBtn: { marginTop: 20, paddingVertical: 12, width: '100%', alignItems: 'center', backgroundColor: COLORS.background, borderRadius: 12 },
   modalCancelText: { fontSize: 15, fontWeight: '700', color: COLORS.text },
-
   bottomSheet: { backgroundColor: COLORS.surface, borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingHorizontal: 25, paddingBottom: 40, width: '100%', maxHeight: height * 0.8, ...SHADOWS.medium },
   sheetHandle: { width: 50, height: 5, backgroundColor: COLORS.border, borderRadius: 3, alignSelf: 'center' },
   sheetTitle: { fontSize: 18, color: COLORS.text, textAlign: 'center', fontWeight: '800', marginBottom: 5 },
   sheetSubtitle: { fontSize: 13, color: COLORS.textSecondary, textAlign: 'center', fontWeight: '500', marginBottom: 20 },
   feedbackOptionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: COLORS.background },
   feedbackOptionText: { fontSize: 15, color: COLORS.text, fontWeight: '600' },
-  
   selectionGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginTop: 10 },
   selectionCard: { width: '48%', backgroundColor: COLORS.background, borderRadius: 12, padding: 10, marginBottom: 15, position: 'relative', height: 140, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: 'transparent' },
   selectionCardActive: { borderColor: COLORS.error, backgroundColor: '#FDF7F7' },
@@ -576,38 +448,5 @@ const styles = StyleSheet.create({
   checkboxIcon: { position: 'absolute', top: 10, left: 10, width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: COLORS.border, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.surface },
   checkboxIconActive: { backgroundColor: COLORS.error, borderColor: COLORS.error },
   doneBtn: { backgroundColor: COLORS.primary, paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginTop: 20 },
-  doneBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-
-  // 🚀 MELEZ ETKİNLİK MODALI STİLLERİ
-  eventBottomSheet: { backgroundColor: COLORS.surface, borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingHorizontal: 25, paddingTop: 15, paddingBottom: 40, width: '100%', maxHeight: height * 0.85, ...SHADOWS.medium },
-  eventHeader: { alignItems: 'center', marginBottom: 20, marginTop: 10 },
-  eventIconWrap: { width: 56, height: 56, borderRadius: 28, backgroundColor: COLORS.accent, justifyContent: 'center', alignItems: 'center', marginBottom: 12, ...SHADOWS.light },
-  eventTitle: { fontSize: 22, fontWeight: '800', color: COLORS.text, marginBottom: 6 },
-  eventSub: { fontSize: 13, color: COLORS.textSecondary, textAlign: 'center', fontWeight: '500', paddingHorizontal: 10 },
-  
-  eventSectionTitle: { fontSize: 12, fontWeight: '800', color: COLORS.text, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
-  
-  eventGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  eventOptionBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.background, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, gap: 6 },
-  eventOptionBtnActive: { backgroundColor: '#F0F5F2', borderColor: COLORS.primary },
-  eventOptionText: { fontSize: 12, fontWeight: '600', color: COLORS.textSecondary },
-  eventOptionTextActive: { color: COLORS.primary, fontWeight: '800' },
-
-  vibeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  vibeOptionBtn: { backgroundColor: COLORS.background, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1, borderColor: COLORS.border },
-  vibeOptionBtnActive: { backgroundColor: COLORS.text, borderColor: COLORS.text },
-  vibeOptionText: { fontSize: 12, fontWeight: '600', color: COLORS.textSecondary },
-  vibeOptionTextActive: { color: COLORS.surface, fontWeight: '800' },
-
-  // Sihirli Kutu Stilleri
-  dividerContainer: { flexDirection: 'row', alignItems: 'center', marginVertical: 20 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: COLORS.border },
-  dividerText: { marginHorizontal: 15, fontSize: 12, fontWeight: '800', color: COLORS.textSecondary },
-  
-  magicBoxContainer: { flexDirection: 'row', backgroundColor: '#F9FBF9', borderRadius: 16, padding: 15, borderWidth: 1, borderColor: '#D0E3D9', alignItems: 'flex-start' },
-  magicBoxIcon: { marginRight: 10, marginTop: 2 },
-  magicBoxInput: { flex: 1, fontSize: 13, color: COLORS.text, fontWeight: '500', minHeight: 60, textAlignVertical: 'top' },
-
-  generateEventBtn: { flexDirection: 'row', backgroundColor: COLORS.accent, paddingVertical: 18, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginTop: 30, gap: 10, ...SHADOWS.light },
-  generateEventBtnText: { color: COLORS.text, fontSize: 16, fontWeight: '800' }
+  doneBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' }
 });

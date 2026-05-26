@@ -12,6 +12,8 @@ import ItemDetailScreen from './src/screens/ItemDetailScreen';
 import PlannerScreen from './src/screens/PlannerScreen';
 import OutfitDetailScreen from './src/screens/OutfitDetailScreen';
 
+import TravelPlannerScreen from './src/screens/wardrobe/TravelPlannerScreen';
+
 // Mevcut Kapsül Ekranı
 import CapsuleResultScreen from './src/screens/wardrobe/CapsuleResultScreen';
 
@@ -115,6 +117,12 @@ export default function App() {
             <Stack.Screen 
               name="EventPlannerScreen" 
               component={EventPlannerScreen} 
+              options={{ presentation: 'fullScreenModal', headerShown: false }} 
+            />
+
+            <Stack.Screen 
+              name="TravelPlannerScreen" 
+              component={TravelPlannerScreen} 
               options={{ presentation: 'fullScreenModal', headerShown: false }} 
             />
 
