@@ -11,7 +11,7 @@ const CURRENT_USER_ID = 1;
 
 const AVAILABLE_CATEGORIES = ['TOPS', 'BOTTOMS', 'FOOTWEAR', 'ACCESSORIES', 'OUTERWEAR', 'FULL_BODY'];
 
-// 🎨 VOGUE RUTHLESS MINIMALISM PALETTE (Dosya içinde tanımlıyoruz)
+// 🎨 VOGUE RUTHLESS MINIMALISM PALETTE
 const VOGUE = {
   bg: '#FFFFFF',
   text: '#1A1A1A',
@@ -19,13 +19,8 @@ const VOGUE = {
   border: '#E8E8E8',
   accent: '#000000',
   softBg: '#F9F9F9',
-  brandText: '#A1A1A1' // Zarif marka ismi rengi
+  brandText: '#A1A1A1' 
 };
-
-// 🚀 SAHTE MARKA VERİSİ (Backend'den gelene kadar test için)
-const MOCK_BRANDS = [
-  "MASSIMO DUTTI", "ZARA", "COS", "ARMANI", "PRADA", "ROLEX", "GUCCI", "H&M"
-];
 
 interface AISuggestionsTabProps {
   allWardrobe: any[]; 
@@ -44,7 +39,6 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
   const [suggestedItems, setSuggestedItems] = useState<{ [slotId: string]: {id: string, uri: string, category: string, brand?: string} }>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isAddMenuVisible, setIsAddMenuVisible] = useState(false);
-  const [isThreeColView, setIsThreeColView] = useState(false);
   
   const [toastVisible, setToastVisible] = useState(false);
   const [isFeedbackVisible, setFeedbackVisible] = useState(false);
@@ -55,7 +49,6 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
   const sheetPanY = useRef(new Animated.Value(height)).current;
   const likeScale = useRef(new Animated.Value(1)).current;
 
-  // AI Motoru Bağlantısı
   const fetchOutfitFromAPI = async (currentSlots: {id: string, category: string}[]) => {
     if (currentSlots.length === 0) return;
     setIsLoading(true);
@@ -75,12 +68,12 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
 
             if (matchIndex !== -1) {
                 const matched = availableItems[matchIndex];
-                // 🚀 DÜZELTME: Marka ismini de ekliyoruz (Backend'den gelmeli, şimdilik rastgele sahte veri atıyoruz)
                 newSuggested[slot.id] = {
                     id: matched.id?.toString() || matched.clothingId?.toString(),
                     uri: matched.imageUrl || matched.uri,
                     category: matched.category,
-                    item: matched.brand
+                    // Not: Java DTO güncellendiğinde burası gerçek marka dolacak.
+                    brand: matched.brand || "VESTIFY" 
                 };
                 availableItems.splice(matchIndex, 1); 
             } 
@@ -113,7 +106,6 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
     fetchOutfitFromAPI(updatedSlots);
   };
 
-  // Feedback Animasyonları ve Mekanizması
   const openFeedbackModal = () => {
     setFeedbackVisible(true);
     Animated.spring(sheetPanY, { toValue: 0, bounciness: 4, useNativeDriver: true }).start();
@@ -152,9 +144,7 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
 
      try {
        await apiClient.post('/feedback', payload);
-     } catch (error) {
-       console.error("🚨 Feedback Hatası:", error);
-     }
+     } catch (error) {}
   };
 
   const handleReasonSelect = (reasonId: string) => {
@@ -195,12 +185,12 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
     });
   };
 
-  // 🚀 YENİ: Kıyafet Detay Sayfasına Gitme
-  const navigateToItemDetail = (itemUri: string) => {
-    if (!itemUri) return;
-    // Detay sayfası isAiGenerated=true ile açılır, sanki internetten yeni bulunmuş gibi.
+  // 🚀 DÜZELTME: Kıyafet Detay Sayfasına Gitme (Hata Giderildi)
+  const navigateToItemDetail = (item: any) => {
+    if (!item || !item.uri) return;
     navigation.navigate('ItemDetail', { 
-        imageUrl: itemUri, 
+        id: item.id, // Sayfanın çökmemesi için ID de yolluyoruz
+        imageUrl: item.uri, 
         isAiGenerated: true 
     });
   };
@@ -210,47 +200,52 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
   return (
     <View style={styles.container}>
       
-      {/* 🚀 YENİ: SİNEMATİK AKSİYON BANNERLARI (Vogue Style) */}
+{/* 🚀 LÜKS AKSİYON BANNERLARI (Tam Oturan Resimler) */}
       <View style={styles.vogueActionHub}>
         
         {/* SEYAHAT BANNER'I */}
-        <TouchableOpacity style={styles.vogueBanner} activeOpacity={0.9} onPress={() => navigation.navigate('TravelPlannerScreen')}>
-          <ImageBackground 
-            source={{ uri: 'https://images.unsplash.com/photo-1549221197-09f193850b1c?q=80&w=600&auto=format&fit=crop' }} // Uçak Kanadı Resmi
-            style={styles.bannerImage}
-            imageStyle={{ borderRadius: 12 }}
-          >
+        <View style={styles.vogueBannerShadow}>
+          <TouchableOpacity style={styles.vogueBannerInner} activeOpacity={0.9} onPress={() => navigation.navigate('TravelPlannerScreen')}>
+            <Image 
+              source={{ uri: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?q=80&w=800&auto=format&fit=crop' }} 
+              style={styles.bannerAbsoluteImage}
+              resizeMode="cover"
+            />
             <View style={styles.bannerOverlay} />
-            <Text style={styles.bannerTitle}>Travel plan?</Text>
-            <Text style={styles.bannerSub}>pack your bags</Text>
-          </ImageBackground>
-        </TouchableOpacity>
+            <View style={styles.bannerTextWrap}>
+              <Text style={styles.bannerTitle}>travel plan?</Text>
+              <Text style={styles.bannerSub}>pack your bags</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
 
         {/* ETKİNLİK BANNER'I */}
-        <TouchableOpacity style={styles.vogueBanner} activeOpacity={0.9} onPress={() => navigation.navigate('EventPlannerScreen')}>
-          <ImageBackground 
-            source={{ uri: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=600&auto=format&fit=crop' }} // Parti Resmi
-            style={styles.bannerImage}
-            imageStyle={{ borderRadius: 12 }}
-          >
+        <View style={styles.vogueBannerShadow}>
+          <TouchableOpacity style={styles.vogueBannerInner} activeOpacity={0.9} onPress={() => navigation.navigate('EventPlannerScreen')}>
+            <Image 
+              source={{ uri: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?q=80&w=800&auto=format&fit=crop' }} 
+              style={styles.bannerAbsoluteImage}
+              resizeMode="cover"
+            />
             <View style={styles.bannerOverlay} />
-            <Text style={styles.bannerTitle}>Where to?</Text>
-            <Text style={styles.bannerSub}>find the perfect outfit</Text>
-          </ImageBackground>
-        </TouchableOpacity>
+            <View style={styles.bannerTextWrap}>
+              <Text style={styles.bannerTitle}>where to?</Text>
+              <Text style={styles.bannerSub}>find the perfect outfit</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
         
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
+        {/* 🚀 DÜZELTME: Ortalanmış Başlık ve Kaldırılan Izgara Tuşu */}
         <View style={styles.headerRow}>
            <View style={styles.aiTitleWrap}>
              <Text style={styles.aiTitleEmoji}>🦋</Text>
              <Text style={styles.infoTitle}>Tell us which outfits you love</Text>
+             <Text style={styles.aiTitleEmoji}>🦋</Text>
            </View>
-           <TouchableOpacity style={styles.viewToggleBtn} onPress={() => setIsThreeColView(!isThreeColView)}>
-             <MaterialCommunityIcons name={isThreeColView ? "view-grid-outline" : "view-grid"} size={22} color={COLORS.primary} />
-           </TouchableOpacity>
         </View>
 
         {isLoading ? (
@@ -265,30 +260,32 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
               {dynamicSlots.map((slot) => {
                  const item = suggestedItems[slot.id];
                  return (
-                     <View key={slot.id} style={isThreeColView ? styles.threeColCard : styles.twoColCard}>
+                     // 🚀 DÜZELTME: Sadece 3'lü kolon (gridCard) stili kullanılıyor
+                     <View key={slot.id} style={styles.gridCard}>
                          
-                         {/* 🚀 DÜZELTME: Tıklanabilir Kıyafet Kutusu */}
+                         {/* Kıyafet Kutusu */}
                          <TouchableOpacity 
-                           activeOpacity={0.9} 
-                           onPress={() => item && navigateToItemDetail(item.uri)}
-                           style={[styles.suggestedItemBox, isThreeColView && { height: height * 0.11 }]}
+                           activeOpacity={0.8} 
+                           onPress={() => navigateToItemDetail(item)}
+                           style={styles.suggestedItemBox}
                          >
                              {item ? (
                                <Image source={{ uri: item.uri }} style={styles.itemImage} />
                              ) : (
-                               <Text style={[styles.noItemText, isThreeColView && { fontSize: 9 }]}>Eşya yok</Text>
+                               <Text style={styles.noItemText}>Eşya yok</Text>
                              )}
                          </TouchableOpacity>
                          
-                         {/* 🚀 DÜZELTME: Zarif Marka İsmi (Category Display silindi!) */}
+                         {/* Zarif Marka Alanı */}
                          <View style={styles.brandRow}>
                            <Text style={styles.brandText} numberOfLines={1}>
                              {item && item.brand ? item.brand : "VESTIFY"}
                            </Text>
                            <TouchableOpacity onPress={() => removeSlot(slot.id)} style={styles.removeBtn}>
-                               <Feather name="trash-2" size={isThreeColView ? 12 : 14} color={VOGUE.secondary} />
+                               <Feather name="trash-2" size={12} color={VOGUE.secondary} />
                            </TouchableOpacity>
                          </View>
+
                      </View>
                  );
               })}
@@ -318,7 +315,7 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
          </TouchableOpacity>
       </View>
 
-      {/* 1. KATEGORİ MODALI */}
+      {/* MODALLAR */}
       <Modal visible={isAddMenuVisible} transparent={true} animationType="slide">
         <View style={styles.modalOverlay}>
            <View style={styles.categoryMenu}>
@@ -337,7 +334,6 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
         </View>
       </Modal>
 
-      {/* 2. GERİBİLDİRİM (RLHF) MODALI */}
       <Modal visible={isFeedbackVisible} transparent animationType="fade">
           <View style={styles.modalOverlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={closeFeedbackModal} />
@@ -424,47 +420,49 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   scrollContent: { paddingBottom: 150, paddingTop: 10 },
   
-  // 🚀 YENİ SİNEMATİK BANNER STİLLERİ (Vogue)
+// 🚀 SİNEMATİK BANNER STİLLERİ (Kusursuz Oturan Yapı)
   vogueActionHub: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 15, paddingTop: 15, gap: 10 },
-  vogueBanner: { width: '48.5%', height: height * 0.14, ...SHADOWS.light },
-  bannerImage: { width: '100%', height: '100%', justifyContent: 'flex-end', padding: 15 },
-  bannerOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 12 }, // Karartma katmanı
-  bannerTitle: { fontSize: 13, fontWeight: '800', color: '#FFF', textTransform: 'capitalize', marginBottom: 2 },
-  bannerSub: { fontSize: 11, color: '#F0F0F0', fontWeight: '600', textTransform: 'lowercase' },
+  
+  vogueBannerShadow: { width: '48.5%', height: height * 0.12, ...SHADOWS.medium },
+  vogueBannerInner: { flex: 1, borderRadius: 12, overflow: 'hidden', backgroundColor: COLORS.surface },
+  
+  bannerAbsoluteImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  bannerOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.35)' }, 
+  
+  bannerTextWrap: { flex: 1, justifyContent: 'flex-end', padding: 15, zIndex: 2 },
+  bannerTitle: { fontSize: 13, fontWeight: '800', color: '#FFF', textTransform: 'uppercase', marginBottom: 2, letterSpacing: 0.5 },
+  bannerSub: { fontSize: 11, color: '#F0F0F0', fontWeight: '500', fontStyle: 'italic' },
 
-  // Başlık Alanı
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginTop: 25, marginBottom: 15 },
-  aiTitleWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  // 🚀 DÜZELTME: Ortalanmış Başlık
+  headerRow: { alignItems: 'center', marginTop: 25, marginBottom: 15 },
+  aiTitleWrap: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center' },
   aiTitleEmoji: { fontSize: 16 },
   infoTitle: { fontSize: 15, fontWeight: '800', color: COLORS.text },
-  viewToggleBtn: { backgroundColor: COLORS.surface, padding: 8, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.light },
 
-  // Izgara ve Kart Stilleri
+  // 🚀 DÜZELTME: Sabit 3'lü Izgara Yapısı
   gridContainer: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 15, justifyContent: 'flex-start', gap: '3%' },
-  twoColCard: { width: '48.5%', backgroundColor: COLORS.surface, borderRadius: 16, marginBottom: 15, padding: 10, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.light },
-  threeColCard: { width: '31.3%', backgroundColor: COLORS.surface, borderRadius: 12, marginBottom: 12, padding: 8, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.light },
+  gridCard: { width: '31.3%', backgroundColor: COLORS.surface, borderRadius: 12, marginBottom: 15, padding: 8, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.light },
   
-  // 🚀 DÜZELTME: Zarif Marka Alanı
   brandRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, borderTopWidth: 1, borderTopColor: '#F0F0F0', paddingTop: 8 },
-  brandText: { fontSize: 9, fontWeight: '800', color: VOGUE.brandText, letterSpacing: 1.5, flex: 1, textTransform: 'uppercase' }, // Vogue Minimalist Tipografi
+  brandText: { fontSize: 9, fontWeight: '800', color: VOGUE.brandText, letterSpacing: 1.5, flex: 1, textTransform: 'uppercase' }, 
   removeBtn: { padding: 2, marginLeft: 5 },
   
-  // Kıyafet Kutusu
-  suggestedItemBox: { width: '100%', height: height * 0.16, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background, borderRadius: 12 },
+  suggestedItemBox: { width: '100%', height: height * 0.11, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background, borderRadius: 12 },
   itemImage: { width: '85%', height: '90%', resizeMode: 'contain' },
-  noItemText: { fontSize: 11, color: COLORS.textSecondary, fontStyle: 'italic', textAlign: 'center' },
+  noItemText: { fontSize: 9, color: COLORS.textSecondary, fontStyle: 'italic', textAlign: 'center' },
 
   addSlotBtn: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surface, paddingVertical: 12, paddingHorizontal: 25, borderRadius: 25, marginTop: 10, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.light, gap: 8 },
   addSlotText: { fontSize: 14, fontWeight: '700', color: COLORS.text },
 
-  // Floating Actions
+  emptyContainer: { alignItems: 'center', marginTop: 80 },
+  emptyText: { marginTop: 15, fontSize: 15, color: COLORS.textSecondary, fontWeight: '500' },
+
   floatingActionArea: { position: 'absolute', bottom: 30, width: '100%', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 30 },
   actionBtnDislike: { backgroundColor: COLORS.surface, width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', ...SHADOWS.medium },
   actionBtnLike: { backgroundColor: COLORS.surface, width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', ...SHADOWS.medium },
   actionBtnRefresh: { backgroundColor: COLORS.primary, width: 80, height: 80, borderRadius: 40, justifyContent: 'center', alignItems: 'center', ...SHADOWS.medium },
   refreshText: { color: '#FFF', fontSize: 11, fontWeight: '700', marginTop: 4 },
 
-  // Modallar ve Bottom Sheet (Değişmedi)
   modalOverlay: { flex: 1, backgroundColor: 'rgba(74, 46, 27, 0.4)', justifyContent: 'flex-end', alignItems: 'center' },
   categoryMenu: { backgroundColor: COLORS.surface, width: '90%', borderRadius: 24, padding: 25, alignItems: 'center', marginBottom: height * 0.3, ...SHADOWS.medium },
   categoryMenuTitle: { fontSize: 16, fontWeight: '800', color: COLORS.text, marginBottom: 20 },
