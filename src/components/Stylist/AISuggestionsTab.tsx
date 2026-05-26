@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Image, Modal, ScrollView, Dimensions, ActivityIndicator, Animated, PanResponder } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Image, Modal, ScrollView, Dimensions, ActivityIndicator, Animated, PanResponder, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import PremiumToast from '../PremiumToast';
@@ -37,38 +37,26 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
   const [selectedReasonCode, setSelectedReasonCode] = useState<string>('NONE');
   const [selectedTargetItems, setSelectedTargetItems] = useState<number[]>([]);
 
+  // 🚀 MELEZ ETKİNLİK MODALI STATE'LERİ
   const [isEventModalVisible, setEventModalVisible] = useState(false);
-
-  // 🚀 YENİ: Etkinlik Formu State'leri
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
   const [selectedVibe, setSelectedVibe] = useState<string | null>(null);
+  const [customPrompt, setCustomPrompt] = useState<string>(''); // Sihirli Kutu State'i
 
   const EVENT_TYPES = [
-    { id: 'WEDDING', label: 'Düğün / Nişan', icon: 'gift' },
-    { id: 'DATE', label: 'Akşam Yemeği / Date', icon: 'heart' },
-    { id: 'BUSINESS', label: 'İş Toplantısı', icon: 'briefcase' },
-    { id: 'PARTY', label: 'Gece Kulübü / Parti', icon: 'music' },
-    { id: 'CASUAL', label: 'Günlük Buluşma', icon: 'coffee' }
+    { id: 'WEDDING', label: 'Düğün/Nişan', icon: 'gift' },
+    { id: 'DATE', label: 'Date/Yemek', icon: 'heart' },
+    { id: 'BUSINESS', label: 'İş/Ofis', icon: 'briefcase' },
+    { id: 'PARTY', label: 'Gece/Parti', icon: 'music' },
+    { id: 'CASUAL', label: 'Günlük', icon: 'coffee' }
   ];
 
   const VIBE_TYPES = [
-    { id: 'FORMAL', label: 'Klasik & Şık' },
+    { id: 'FORMAL', label: 'Klasik' },
     { id: 'SMART_CASUAL', label: 'Smart Casual' },
-    { id: 'EDGY', label: 'İddialı & Dikkat Çekici' },
-    { id: 'COMFORT', label: 'Rahat & Salaş' }
+    { id: 'EDGY', label: 'İddialı' },
+    { id: 'COMFORT', label: 'Salaş/Rahat' }
   ];
-
-  // Form Gönderme Aksiyonu
-  const handleEventSubmit = () => {
-    if (!selectedEvent || !selectedVibe) {
-       alert("Lütfen bir etkinlik ve tarz seçin.");
-       return;
-    }
-    setEventModalVisible(false);
-    // İleride buraya Python AI motoruna "Düğün" ve "Klasik" parametrelerini yollayacağımız kodu ekleyeceğiz!
-    console.log("Seçilen Etkinlik:", selectedEvent, "Tarz:", selectedVibe);
-    alert("Vestify AI etkinliğinize özel parçaları seçiyor...");
-  };
 
   const sheetPanY = useRef(new Animated.Value(height)).current;
   const likeScale = useRef(new Animated.Value(1)).current;
@@ -128,7 +116,7 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
     fetchOutfitFromAPI(updatedSlots);
   };
 
-  // Feedback Animasyonları ve Mekanizması (Eksiksiz)
+  // Feedback Animasyonları ve Mekanizması
   const openFeedbackModal = () => {
     setFeedbackVisible(true);
     Animated.spring(sheetPanY, { toValue: 0, bounciness: 4, useNativeDriver: true }).start();
@@ -210,15 +198,39 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
     });
   };
 
+// 🚀 GÜNCELLENMİŞ: MELEZ FORM GÖNDERME MANTIĞI
+  const handleEventSubmit = () => {
+    let finalContext = '';
+    
+    // 1. Öncelik: Eğer Sihirli Kutu'ya bir şey yazıldıysa, direkt onu al
+    if (customPrompt.trim().length > 0) {
+      finalContext = customPrompt.trim();
+    } 
+    // 2. Öncelik: Eğer kutu boşsa, butonlardan seçilenleri birleştir
+    else if (selectedEvent && selectedVibe) {
+      const eventLabel = EVENT_TYPES.find(e => e.id === selectedEvent)?.label;
+      const vibeLabel = VIBE_TYPES.find(v => v.id === selectedVibe)?.label;
+      finalContext = `${eventLabel} konseptinde, ${vibeLabel} tarzında bir görünüm`;
+    } 
+    // Hiçbiri yoksa uyar
+    else {
+      alert("Lütfen butonlardan seçim yapın veya Sihirli Kutu'ya ne istediğinizi yazın.");
+      return;
+    }
+
+    setEventModalVisible(false); // Modalı kapat
+    
+    // 🚀 MİMARİ HAMLE: Elde ettiğimiz "Bağlamı (Context)" yeni Lüks Vitrin ekranımıza parametre olarak taşıyoruz.
+    navigation.navigate('EventResultScreen', { eventContext: finalContext });
+  };
+
   const currentOutfitArray = dynamicSlots.map(slot => suggestedItems[slot.id]).filter(Boolean);
 
   return (
     <View style={styles.container}>
       
-      {/* 🚀 YENİ VİTRİN: Yan Yana (Split Cards) Aksiyon Merkezi */}
+      {/* Yan Yana Aksiyon Vitrini (Split Cards) */}
       <View style={styles.actionHubContainer}>
-        
-        {/* SEYAHAT KARTI */}
         <TouchableOpacity style={styles.actionCard} activeOpacity={0.8} onPress={() => navigation.navigate('Planner')}>
           <View style={[styles.cardIconBox, { backgroundColor: COLORS.primary }]}>
             <Feather name="briefcase" size={20} color="#FFF" />
@@ -227,7 +239,6 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
           <Text style={styles.cardSub}>Hadi bavulunu hazırlayalım</Text>
         </TouchableOpacity>
 
-        {/* ETKİNLİK KARTI */}
         <TouchableOpacity style={styles.actionCard} activeOpacity={0.8} onPress={() => setEventModalVisible(true)}>
           <View style={[styles.cardIconBox, { backgroundColor: COLORS.accent }]}>
             <Feather name="star" size={20} color={COLORS.text} />
@@ -235,16 +246,15 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
           <Text style={styles.cardTitle}>Özel Etkinlik ✨</Text>
           <Text style={styles.cardSub}>Kusursuz kombini bul</Text>
         </TouchableOpacity>
-        
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
-        {/* 🚀 KLASİK VE SEVİLEN BAŞLIK */}
         <View style={styles.headerRow}>
            <View style={styles.aiTitleWrap}>
              <Text style={styles.aiTitleEmoji}>🦋</Text>
              <Text style={styles.infoTitle}>Tell us which outfits you love</Text>
+             <Text style={styles.aiTitleEmoji}>🦋</Text>
            </View>
            <TouchableOpacity style={styles.viewToggleBtn} onPress={() => setIsThreeColView(!isThreeColView)}>
              <MaterialCommunityIcons name={isThreeColView ? "view-grid-outline" : "view-grid"} size={22} color={COLORS.primary} />
@@ -286,7 +296,7 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
 
       </ScrollView>
 
-      {/* FLOATİNG AKSİYON BÖLGESİ (OnPress hatası düzeltildi) */}
+      {/* FLOATİNG AKSİYON BÖLGESİ */}
       <View style={styles.floatingActionArea}>
          <TouchableOpacity style={styles.actionBtnDislike} onPress={openFeedbackModal} activeOpacity={0.8}>
            <Feather name="x" size={28} color={COLORS.error} />
@@ -304,6 +314,7 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
 
       {/* 1. KATEGORİ MODALI */}
       <Modal visible={isAddMenuVisible} transparent={true} animationType="slide">
+        {/* İçerik öncekiyle aynı */}
         <View style={styles.modalOverlay}>
            <View style={styles.categoryMenu}>
                <Text style={styles.categoryMenuTitle}>Hangi kategoriyi eklemek istersin?</Text>
@@ -321,9 +332,10 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
         </View>
       </Modal>
 
-      {/* 2. GERİBİLDİRİM (RLHF) MODALI - Tam ve Eksiksiz */}
+      {/* 2. GERİBİLDİRİM MODALI */}
       <Modal visible={isFeedbackVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
+          {/* İçerik öncekiyle tamamen aynı */}
+          <View style={styles.modalOverlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={closeFeedbackModal} />
           <Animated.View style={[styles.bottomSheet, { transform: [{ translateY: sheetPanY }] }]}>
             <View style={{ width: '100%', paddingVertical: 10 }} {...feedbackPanResponder.panHandlers}>
@@ -399,9 +411,10 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
         </View>
       </Modal>
 
-      {/* 3. ÖZEL ETKİNLİK MODALI (Yeni Tasarım) */}
+      {/* 3. 🚀 YENİ: MELEZ ETKİNLİK (EVENT) MODALI */}
       <Modal visible={isEventModalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
+        {/* Klavye açıldığında formun yukarı kayması için KeyboardAvoidingView kullanıyoruz */}
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setEventModalVisible(false)} />
           
           <View style={styles.eventBottomSheet}>
@@ -415,18 +428,19 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
                <Text style={styles.eventSub}>Vestify AI, mekana ve konsepte en uygun parçaları seçecek.</Text>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 20 }}>
               
+              {/* TIKLANABİLİR LÜKS BUTONLAR */}
               <Text style={styles.eventSectionTitle}>Etkinlik Türü</Text>
               <View style={styles.eventGrid}>
                 {EVENT_TYPES.map(evt => (
                   <TouchableOpacity 
                     key={evt.id} 
                     style={[styles.eventOptionBtn, selectedEvent === evt.id && styles.eventOptionBtnActive]}
-                    onPress={() => setSelectedEvent(evt.id)}
+                    onPress={() => { setSelectedEvent(evt.id); setCustomPrompt(''); /* Sihirli kutuyu temizle */ }}
                     activeOpacity={0.7}
                   >
-                    <Feather name={evt.icon as any} size={18} color={selectedEvent === evt.id ? COLORS.primary : COLORS.textSecondary} />
+                    <Feather name={evt.icon as any} size={16} color={selectedEvent === evt.id ? COLORS.primary : COLORS.textSecondary} />
                     <Text style={[styles.eventOptionText, selectedEvent === evt.id && styles.eventOptionTextActive]}>
                       {evt.label}
                     </Text>
@@ -440,7 +454,7 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
                   <TouchableOpacity 
                     key={vibe.id} 
                     style={[styles.vibeOptionBtn, selectedVibe === vibe.id && styles.vibeOptionBtnActive]}
-                    onPress={() => setSelectedVibe(vibe.id)}
+                    onPress={() => { setSelectedVibe(vibe.id); setCustomPrompt(''); /* Sihirli kutuyu temizle */ }}
                     activeOpacity={0.7}
                   >
                     <Text style={[styles.vibeOptionText, selectedVibe === vibe.id && styles.vibeOptionTextActive]}>
@@ -450,11 +464,40 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
                 ))}
               </View>
 
+              {/* VEYA AYIRICI */}
+              <View style={styles.dividerContainer}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>VEYA</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              {/* SİHİRLİ KUTU (GEMINI'YE FISILDA) */}
+              <Text style={styles.eventSectionTitle}>Sihirli Kutu ✨</Text>
+              <View style={styles.magicBoxContainer}>
+                 <Feather name="edit-3" size={20} color={COLORS.primary} style={styles.magicBoxIcon} />
+                 <TextInput
+                   style={styles.magicBoxInput}
+                   placeholder="Detayları Vestify AI'a fısılda... (Örn: Eski sevgilimin düğününe gidiyorum, çok iddialı olmalıyım)"
+                   placeholderTextColor={COLORS.textSecondary}
+                   multiline
+                   maxLength={150}
+                   value={customPrompt}
+                   onChangeText={(text) => {
+                     setCustomPrompt(text);
+                     // Sihirli kutuya yazıyorsa, buton seçimlerini sıfırla
+                     if (text.length > 0) {
+                       setSelectedEvent(null);
+                       setSelectedVibe(null);
+                     }
+                   }}
+                 />
+              </View>
+
               <TouchableOpacity 
-                style={[styles.generateEventBtn, (!selectedEvent || !selectedVibe) && { opacity: 0.5 }]} 
+                style={[styles.generateEventBtn, (!customPrompt && (!selectedEvent || !selectedVibe)) && { opacity: 0.5 }]} 
                 activeOpacity={0.8}
                 onPress={handleEventSubmit}
-                disabled={!selectedEvent || !selectedVibe}
+                disabled={!customPrompt && (!selectedEvent || !selectedVibe)}
               >
                 <Text style={styles.generateEventBtnText}>Kusursuz Kombinimi Bul</Text>
                 <Feather name="arrow-right" size={20} color={COLORS.text} />
@@ -462,7 +505,7 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
               
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <PremiumToast visible={toastVisible} message="Kombin dolaba eklendi! 🦋" onHide={() => setToastVisible(false)} />
@@ -474,14 +517,12 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   scrollContent: { paddingBottom: 150, paddingTop: 10 },
   
-  // 🚀 YENİ VİTRİN: YAN YANA KARTLAR (Split Cards)
   actionHubContainer: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 15, paddingTop: 15 },
   actionCard: { width: '48%', backgroundColor: COLORS.surface, padding: 15, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.light },
   cardIconBox: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
   cardTitle: { fontSize: 13, fontWeight: '800', color: COLORS.text, marginBottom: 4 },
   cardSub: { fontSize: 11, color: COLORS.textSecondary, fontWeight: '600' },
 
-  // Başlık Alanı
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginTop: 25, marginBottom: 15 },
   aiTitleWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   aiTitleEmoji: { fontSize: 16 },
@@ -534,30 +575,38 @@ const styles = StyleSheet.create({
   selectionImage: { width: '80%', height: '80%', resizeMode: 'contain' },
   checkboxIcon: { position: 'absolute', top: 10, left: 10, width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: COLORS.border, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.surface },
   checkboxIconActive: { backgroundColor: COLORS.error, borderColor: COLORS.error },
-  
   doneBtn: { backgroundColor: COLORS.primary, paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginTop: 20 },
   doneBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
 
-  // 🚀 ÖZEL ETKİNLİK MODALI STİLLERİ
+  // 🚀 MELEZ ETKİNLİK MODALI STİLLERİ
   eventBottomSheet: { backgroundColor: COLORS.surface, borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingHorizontal: 25, paddingTop: 15, paddingBottom: 40, width: '100%', maxHeight: height * 0.85, ...SHADOWS.medium },
-  eventHeader: { alignItems: 'center', marginBottom: 25, marginTop: 10 },
+  eventHeader: { alignItems: 'center', marginBottom: 20, marginTop: 10 },
   eventIconWrap: { width: 56, height: 56, borderRadius: 28, backgroundColor: COLORS.accent, justifyContent: 'center', alignItems: 'center', marginBottom: 12, ...SHADOWS.light },
   eventTitle: { fontSize: 22, fontWeight: '800', color: COLORS.text, marginBottom: 6 },
   eventSub: { fontSize: 13, color: COLORS.textSecondary, textAlign: 'center', fontWeight: '500', paddingHorizontal: 10 },
   
-  eventSectionTitle: { fontSize: 14, fontWeight: '800', color: COLORS.text, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
+  eventSectionTitle: { fontSize: 12, fontWeight: '800', color: COLORS.text, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
   
   eventGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  eventOptionBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.background, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, gap: 8 },
-  eventOptionBtnActive: { backgroundColor: '#F0F5F2', borderColor: COLORS.primary }, // Hafif şeffaf yeşil Gofrik efekti
-  eventOptionText: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary },
-  eventOptionTextActive: { color: COLORS.primary, fontWeight: '700' },
+  eventOptionBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.background, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, gap: 6 },
+  eventOptionBtnActive: { backgroundColor: '#F0F5F2', borderColor: COLORS.primary },
+  eventOptionText: { fontSize: 12, fontWeight: '600', color: COLORS.textSecondary },
+  eventOptionTextActive: { color: COLORS.primary, fontWeight: '800' },
 
   vibeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   vibeOptionBtn: { backgroundColor: COLORS.background, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1, borderColor: COLORS.border },
   vibeOptionBtnActive: { backgroundColor: COLORS.text, borderColor: COLORS.text },
-  vibeOptionText: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary },
-  vibeOptionTextActive: { color: COLORS.surface, fontWeight: '700' },
+  vibeOptionText: { fontSize: 12, fontWeight: '600', color: COLORS.textSecondary },
+  vibeOptionTextActive: { color: COLORS.surface, fontWeight: '800' },
+
+  // Sihirli Kutu Stilleri
+  dividerContainer: { flexDirection: 'row', alignItems: 'center', marginVertical: 20 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: COLORS.border },
+  dividerText: { marginHorizontal: 15, fontSize: 12, fontWeight: '800', color: COLORS.textSecondary },
+  
+  magicBoxContainer: { flexDirection: 'row', backgroundColor: '#F9FBF9', borderRadius: 16, padding: 15, borderWidth: 1, borderColor: '#D0E3D9', alignItems: 'flex-start' },
+  magicBoxIcon: { marginRight: 10, marginTop: 2 },
+  magicBoxInput: { flex: 1, fontSize: 13, color: COLORS.text, fontWeight: '500', minHeight: 60, textAlignVertical: 'top' },
 
   generateEventBtn: { flexDirection: 'row', backgroundColor: COLORS.accent, paddingVertical: 18, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginTop: 30, gap: 10, ...SHADOWS.light },
   generateEventBtnText: { color: COLORS.text, fontSize: 16, fontWeight: '800' }

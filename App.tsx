@@ -12,8 +12,12 @@ import ItemDetailScreen from './src/screens/ItemDetailScreen';
 import PlannerScreen from './src/screens/PlannerScreen';
 import OutfitDetailScreen from './src/screens/OutfitDetailScreen';
 
-// 🚀 YENİ: Kapsül Sonuç Ekranı projeye dahil edildi
+// Mevcut Kapsül Ekranı
 import CapsuleResultScreen from './src/screens/wardrobe/CapsuleResultScreen';
+
+// Etkinlik Sonuç Ekranı projeye dahil edildi
+import EventResultScreen from './src/screens/wardrobe/EventResultScreen';
+import EventPlannerScreen from './src/screens/wardrobe/EventPlannerScreen'; // 👈 1. ADIM: Yeni oluşturduğun ekranı import et
 
 const Stack = createNativeStackNavigator();
 
@@ -91,13 +95,29 @@ export default function App() {
               options={{ presentation: 'card', headerShown: false }} 
             />
 
-            {/* 🚀 5. KAT: Yeni Kapsül Sonuç Ekranımız */}
+            {/* 5. KAT: Kapsül Sonuç Ekranımız */}
             <Stack.Screen 
               name="CapsuleResultScreen" 
               component={CapsuleResultScreen} 
               options={{ presentation: 'card', headerShown: false }} 
             />
+
+            {/* 🚀 6. KAT: Yeni Etkinlik Sonuç Ekranımız */}
+            <Stack.Screen 
+              name="EventResultScreen" 
+              component={EventResultScreen} 
+              // Kullanıcıya lüks bir his vermek için ekranı alttan yukarı kaydırarak açıyoruz
+              options={{ presentation: 'modal', headerShown: false }} 
+            />
             
+            {/* 🚀 2. ADIM: Yeni ekranını buraya Stack ağacına ekle */}
+            {/* presentation: 'fullScreenModal' diyerek sayfanın alt tepsiler gibi değil, tam ekran olarak lüks bir şekilde açılmasını sağlıyoruz */}
+            <Stack.Screen 
+              name="EventPlannerScreen" 
+              component={EventPlannerScreen} 
+              options={{ presentation: 'fullScreenModal', headerShown: false }} 
+            />
+
           </Stack.Navigator>
           
           <StatusBar style="dark" />
