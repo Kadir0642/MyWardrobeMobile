@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Image, Modal, ScrollView, Dimensions, ActivityIndicator, Animated, PanResponder } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import PremiumToast from '../PremiumToast';
 import { apiClient } from '../../api/client';
 import { COLORS, SHADOWS } from '../../theme/theme'; 
@@ -16,6 +17,8 @@ interface AISuggestionsTabProps {
 }
 
 export default function AISuggestionsTab({ allWardrobe = [], weather }: AISuggestionsTabProps) {
+  const navigation = useNavigation<any>(); 
+
   const [dynamicSlots, setDynamicSlots] = useState<{id: string, category: string}[]>([
     { id: `slot_tops_${Date.now()}`, category: 'TOPS' },
     { id: `slot_bottoms_${Date.now()+1}`, category: 'BOTTOMS' },
@@ -26,7 +29,6 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
   const [isLoading, setIsLoading] = useState(false);
   const [isAddMenuVisible, setIsAddMenuVisible] = useState(false);
   
-  // 🚀 YENİ: Görünüm Modu (Varsayılan 2'li, Tıklanırsa 3'lü)
   const [isThreeColView, setIsThreeColView] = useState(false);
   
   const [toastVisible, setToastVisible] = useState(false);
@@ -34,6 +36,39 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
   const [feedbackStep, setFeedbackStep] = useState<'REASON' | 'SELECT_ITEMS'>('REASON');
   const [selectedReasonCode, setSelectedReasonCode] = useState<string>('NONE');
   const [selectedTargetItems, setSelectedTargetItems] = useState<number[]>([]);
+
+  const [isEventModalVisible, setEventModalVisible] = useState(false);
+
+  // 🚀 YENİ: Etkinlik Formu State'leri
+  const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
+  const [selectedVibe, setSelectedVibe] = useState<string | null>(null);
+
+  const EVENT_TYPES = [
+    { id: 'WEDDING', label: 'Düğün / Nişan', icon: 'gift' },
+    { id: 'DATE', label: 'Akşam Yemeği / Date', icon: 'heart' },
+    { id: 'BUSINESS', label: 'İş Toplantısı', icon: 'briefcase' },
+    { id: 'PARTY', label: 'Gece Kulübü / Parti', icon: 'music' },
+    { id: 'CASUAL', label: 'Günlük Buluşma', icon: 'coffee' }
+  ];
+
+  const VIBE_TYPES = [
+    { id: 'FORMAL', label: 'Klasik & Şık' },
+    { id: 'SMART_CASUAL', label: 'Smart Casual' },
+    { id: 'EDGY', label: 'İddialı & Dikkat Çekici' },
+    { id: 'COMFORT', label: 'Rahat & Salaş' }
+  ];
+
+  // Form Gönderme Aksiyonu
+  const handleEventSubmit = () => {
+    if (!selectedEvent || !selectedVibe) {
+       alert("Lütfen bir etkinlik ve tarz seçin.");
+       return;
+    }
+    setEventModalVisible(false);
+    // İleride buraya Python AI motoruna "Düğün" ve "Klasik" parametrelerini yollayacağımız kodu ekleyeceğiz!
+    console.log("Seçilen Etkinlik:", selectedEvent, "Tarz:", selectedVibe);
+    alert("Vestify AI etkinliğinize özel parçaları seçiyor...");
+  };
 
   const sheetPanY = useRef(new Animated.Value(height)).current;
   const likeScale = useRef(new Animated.Value(1)).current;
@@ -47,14 +82,12 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
       
       if (response.status === 200 && Array.isArray(response.data)) {
         const newSuggested: any = {};
-        
-        // 🚀 DÜZELTME: Kategori Eşleştirme Motoru (Python henüz hazır olmadığı için Defensive Programming)
         let availableItems = [...response.data];
 
         currentSlots.forEach((slot) => {
-            // Python'dan gelen listede, slotun kategorisiyle eşleşen ilk ürünü bul
+            const normalizedSlotCat = slot.category.replace('_', ' ').toUpperCase();
             const matchIndex = availableItems.findIndex(item => 
-                (item.category || '').toUpperCase() === slot.category.toUpperCase()
+                (item.category || '').replace('_', ' ').toUpperCase() === normalizedSlotCat
             );
 
             if (matchIndex !== -1) {
@@ -64,23 +97,19 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
                     uri: matched.imageUrl || matched.uri,
                     category: matched.category
                 };
-                availableItems.splice(matchIndex, 1); // Kullanılanı listeden çıkar
+                availableItems.splice(matchIndex, 1); 
             } 
-            // Eşleşme yoksa o slota zorla yanlış eşya (örn: T-shirt) KOYMA. Boş kalsın.
         });
-        
         setSuggestedItems(newSuggested);
       }
     } catch (error: any) {
-      console.error("🚨 AI Kombin Getirme Hatası:", error.response?.data || error.message);
+      console.error("🚨 AI Kombin Hatası:", error.message);
     } finally {
       setTimeout(() => setIsLoading(false), 300); 
     }
   };
 
-  useEffect(() => {
-    fetchOutfitFromAPI(dynamicSlots);
-  }, []);
+  useEffect(() => { fetchOutfitFromAPI(dynamicSlots); }, []);
 
   const addSlot = (category: string) => {
     const newSlot = { id: `slot_${category.toLowerCase()}_${Date.now()}`, category };
@@ -99,7 +128,7 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
     fetchOutfitFromAPI(updatedSlots);
   };
 
-  // Feedback Animasyonları
+  // Feedback Animasyonları ve Mekanizması (Eksiksiz)
   const openFeedbackModal = () => {
     setFeedbackVisible(true);
     Animated.spring(sheetPanY, { toValue: 0, bounciness: 4, useNativeDriver: true }).start();
@@ -172,12 +201,8 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
     ]).start(async () => {
       const outfitIds = Object.values(suggestedItems).map(item => parseInt(item.id, 10)).filter(id => !isNaN(id));
       if(outfitIds.length > 0) {
-          sendFeedbackToAPI('LIKE', 'NONE', []); 
           try {
-             await apiClient.post(`/outfits/${CURRENT_USER_ID}/save`, {
-               name: `AI Match - ${new Date().toLocaleDateString('tr-TR')}`, 
-               clothingItemIds: outfitIds 
-             });
+             await apiClient.post(`/outfits/${CURRENT_USER_ID}/save`, { name: `AI Match - ${new Date().toLocaleDateString('tr-TR')}`, clothingItemIds: outfitIds });
              setToastVisible(true);
              fetchOutfitFromAPI(dynamicSlots);
           } catch(e) {}
@@ -190,30 +215,39 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
   return (
     <View style={styles.container}>
       
-      <TouchableOpacity style={styles.eventBanner} activeOpacity={0.8}>
-        <View style={styles.eventBannerContent}>
-          <Feather name="star" size={20} color={COLORS.accent} />
-          <Text style={styles.eventBannerText}>Özel bir etkinliğe mi hazırlanıyorsun? ✨</Text>
-        </View>
-        <Feather name="chevron-right" size={20} color={COLORS.primary} />
-      </TouchableOpacity>
+      {/* 🚀 YENİ VİTRİN: Yan Yana (Split Cards) Aksiyon Merkezi */}
+      <View style={styles.actionHubContainer}>
+        
+        {/* SEYAHAT KARTI */}
+        <TouchableOpacity style={styles.actionCard} activeOpacity={0.8} onPress={() => navigation.navigate('Planner')}>
+          <View style={[styles.cardIconBox, { backgroundColor: COLORS.primary }]}>
+            <Feather name="briefcase" size={20} color="#FFF" />
+          </View>
+          <Text style={styles.cardTitle}>Seyahat Planı</Text>
+          <Text style={styles.cardSub}>Hadi bavulunu hazırlayalım</Text>
+        </TouchableOpacity>
+
+        {/* ETKİNLİK KARTI */}
+        <TouchableOpacity style={styles.actionCard} activeOpacity={0.8} onPress={() => setEventModalVisible(true)}>
+          <View style={[styles.cardIconBox, { backgroundColor: COLORS.accent }]}>
+            <Feather name="star" size={20} color={COLORS.text} />
+          </View>
+          <Text style={styles.cardTitle}>Özel Etkinlik ✨</Text>
+          <Text style={styles.cardSub}>Kusursuz kombini bul</Text>
+        </TouchableOpacity>
+        
+      </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
+        {/* 🚀 KLASİK VE SEVİLEN BAŞLIK */}
         <View style={styles.headerRow}>
-           <View>
-             <Text style={styles.infoTitle}>Dinamik Kapsül</Text>
-             <Text style={styles.infoDesc}>Slotları belirle, yapay zeka kombinlesin.</Text>
+           <View style={styles.aiTitleWrap}>
+             <Text style={styles.aiTitleEmoji}>🦋</Text>
+             <Text style={styles.infoTitle}>Tell us which outfits you love</Text>
            </View>
-           <TouchableOpacity 
-             style={styles.viewToggleBtn} 
-             onPress={() => setIsThreeColView(!isThreeColView)}
-           >
-             <MaterialCommunityIcons 
-               name={isThreeColView ? "view-grid-outline" : "view-grid"} 
-               size={24} 
-               color={COLORS.primary} 
-             />
+           <TouchableOpacity style={styles.viewToggleBtn} onPress={() => setIsThreeColView(!isThreeColView)}>
+             <MaterialCommunityIcons name={isThreeColView ? "view-grid-outline" : "view-grid"} size={22} color={COLORS.primary} />
            </TouchableOpacity>
         </View>
 
@@ -231,20 +265,13 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
                  return (
                      <View key={slot.id} style={isThreeColView ? styles.threeColCard : styles.twoColCard}>
                          <View style={styles.rowHeader}>
-                             <Text style={[styles.rowCategory, isThreeColView && { fontSize: 9 }]} numberOfLines={1}>
-                               {slot.category}
-                             </Text>
+                             <Text style={[styles.rowCategory, isThreeColView && { fontSize: 9 }]} numberOfLines={1}>{slot.category}</Text>
                              <TouchableOpacity onPress={() => removeSlot(slot.id)} style={styles.removeBtn}>
                                  <Feather name="trash-2" size={isThreeColView ? 14 : 16} color={COLORS.error} />
                              </TouchableOpacity>
                          </View>
-
                          <View style={[styles.suggestedItemBox, isThreeColView && { height: height * 0.11 }]}>
-                             {item ? (
-                                 <Image source={{ uri: item.uri }} style={styles.itemImage} />
-                             ) : (
-                                 <Text style={[styles.noItemText, isThreeColView && { fontSize: 9 }]}>Eşya yok</Text>
-                             )}
+                             {item ? <Image source={{ uri: item.uri }} style={styles.itemImage} /> : <Text style={[styles.noItemText, isThreeColView && { fontSize: 9 }]}>Eşya yok</Text>}
                          </View>
                      </View>
                  );
@@ -259,17 +286,15 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
 
       </ScrollView>
 
-      {/* FLOATİNG AKSİYON BÖLGESİ */}
+      {/* FLOATİNG AKSİYON BÖLGESİ (OnPress hatası düzeltildi) */}
       <View style={styles.floatingActionArea}>
          <TouchableOpacity style={styles.actionBtnDislike} onPress={openFeedbackModal} activeOpacity={0.8}>
            <Feather name="x" size={28} color={COLORS.error} />
          </TouchableOpacity>
-         
          <TouchableOpacity style={styles.actionBtnRefresh} onPress={() => fetchOutfitFromAPI(dynamicSlots)} activeOpacity={0.7}>
            <MaterialCommunityIcons name="butterfly-outline" size={32} color="#FFF" />
            <Text style={styles.refreshText}>Yenile</Text>
          </TouchableOpacity>
-         
          <TouchableOpacity style={styles.actionBtnLike} onPress={handleLike} activeOpacity={0.9}>
            <Animated.View style={{ transform: [{ scale: likeScale }] }}>
              <MaterialCommunityIcons name="heart" size={28} color={COLORS.primary} />
@@ -296,7 +321,7 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
         </View>
       </Modal>
 
-      {/* 2. GERİBİLDİRİM MODALI */}
+      {/* 2. GERİBİLDİRİM (RLHF) MODALI - Tam ve Eksiksiz */}
       <Modal visible={isFeedbackVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={closeFeedbackModal} />
@@ -374,6 +399,72 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
         </View>
       </Modal>
 
+      {/* 3. ÖZEL ETKİNLİK MODALI (Yeni Tasarım) */}
+      <Modal visible={isEventModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setEventModalVisible(false)} />
+          
+          <View style={styles.eventBottomSheet}>
+            <View style={styles.sheetHandle} />
+            
+            <View style={styles.eventHeader}>
+               <View style={styles.eventIconWrap}>
+                 <Feather name="star" size={24} color={COLORS.text} />
+               </View>
+               <Text style={styles.eventTitle}>Nereye Gidiyoruz?</Text>
+               <Text style={styles.eventSub}>Vestify AI, mekana ve konsepte en uygun parçaları seçecek.</Text>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+              
+              <Text style={styles.eventSectionTitle}>Etkinlik Türü</Text>
+              <View style={styles.eventGrid}>
+                {EVENT_TYPES.map(evt => (
+                  <TouchableOpacity 
+                    key={evt.id} 
+                    style={[styles.eventOptionBtn, selectedEvent === evt.id && styles.eventOptionBtnActive]}
+                    onPress={() => setSelectedEvent(evt.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Feather name={evt.icon as any} size={18} color={selectedEvent === evt.id ? COLORS.primary : COLORS.textSecondary} />
+                    <Text style={[styles.eventOptionText, selectedEvent === evt.id && styles.eventOptionTextActive]}>
+                      {evt.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={[styles.eventSectionTitle, { marginTop: 20 }]}>Yaratmak İstediğin İzlenim</Text>
+              <View style={styles.vibeGrid}>
+                {VIBE_TYPES.map(vibe => (
+                  <TouchableOpacity 
+                    key={vibe.id} 
+                    style={[styles.vibeOptionBtn, selectedVibe === vibe.id && styles.vibeOptionBtnActive]}
+                    onPress={() => setSelectedVibe(vibe.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.vibeOptionText, selectedVibe === vibe.id && styles.vibeOptionTextActive]}>
+                      {vibe.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TouchableOpacity 
+                style={[styles.generateEventBtn, (!selectedEvent || !selectedVibe) && { opacity: 0.5 }]} 
+                activeOpacity={0.8}
+                onPress={handleEventSubmit}
+                disabled={!selectedEvent || !selectedVibe}
+              >
+                <Text style={styles.generateEventBtnText}>Kusursuz Kombinimi Bul</Text>
+                <Feather name="arrow-right" size={20} color={COLORS.text} />
+              </TouchableOpacity>
+              
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       <PremiumToast visible={toastVisible} message="Kombin dolaba eklendi! 🦋" onHide={() => setToastVisible(false)} />
     </View>
   );
@@ -383,18 +474,21 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   scrollContent: { paddingBottom: 150, paddingTop: 10 },
   
-  eventBanner: { alignSelf: 'center', width: '90%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: COLORS.surface, marginTop: 5, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.light },
-  eventBannerContent: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  eventBannerText: { fontSize: 14, fontWeight: '700', color: COLORS.text },
+  // 🚀 YENİ VİTRİN: YAN YANA KARTLAR (Split Cards)
+  actionHubContainer: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 15, paddingTop: 15 },
+  actionCard: { width: '48%', backgroundColor: COLORS.surface, padding: 15, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.light },
+  cardIconBox: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+  cardTitle: { fontSize: 13, fontWeight: '800', color: COLORS.text, marginBottom: 4 },
+  cardSub: { fontSize: 11, color: COLORS.textSecondary, fontWeight: '600' },
 
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 25, marginTop: 25, marginBottom: 15 },
-  infoTitle: { fontSize: 18, fontWeight: '800', color: COLORS.text },
-  infoDesc: { fontSize: 12, color: COLORS.textSecondary, marginTop: 4 },
+  // Başlık Alanı
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginTop: 25, marginBottom: 15 },
+  aiTitleWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  aiTitleEmoji: { fontSize: 16 },
+  infoTitle: { fontSize: 15, fontWeight: '800', color: COLORS.text },
   viewToggleBtn: { backgroundColor: COLORS.surface, padding: 8, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.light },
 
-  // 🚀 IZGARA SİSTEMİ
   gridContainer: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 15, justifyContent: 'flex-start', gap: '3%' },
-  
   twoColCard: { width: '48%', backgroundColor: COLORS.surface, borderRadius: 20, marginBottom: 15, padding: 12, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.light },
   threeColCard: { width: '31%', backgroundColor: COLORS.surface, borderRadius: 16, marginBottom: 12, padding: 8, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.light },
   
@@ -442,5 +536,29 @@ const styles = StyleSheet.create({
   checkboxIconActive: { backgroundColor: COLORS.error, borderColor: COLORS.error },
   
   doneBtn: { backgroundColor: COLORS.primary, paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginTop: 20 },
-  doneBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' }
+  doneBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+
+  // 🚀 ÖZEL ETKİNLİK MODALI STİLLERİ
+  eventBottomSheet: { backgroundColor: COLORS.surface, borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingHorizontal: 25, paddingTop: 15, paddingBottom: 40, width: '100%', maxHeight: height * 0.85, ...SHADOWS.medium },
+  eventHeader: { alignItems: 'center', marginBottom: 25, marginTop: 10 },
+  eventIconWrap: { width: 56, height: 56, borderRadius: 28, backgroundColor: COLORS.accent, justifyContent: 'center', alignItems: 'center', marginBottom: 12, ...SHADOWS.light },
+  eventTitle: { fontSize: 22, fontWeight: '800', color: COLORS.text, marginBottom: 6 },
+  eventSub: { fontSize: 13, color: COLORS.textSecondary, textAlign: 'center', fontWeight: '500', paddingHorizontal: 10 },
+  
+  eventSectionTitle: { fontSize: 14, fontWeight: '800', color: COLORS.text, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
+  
+  eventGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  eventOptionBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.background, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, gap: 8 },
+  eventOptionBtnActive: { backgroundColor: '#F0F5F2', borderColor: COLORS.primary }, // Hafif şeffaf yeşil Gofrik efekti
+  eventOptionText: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary },
+  eventOptionTextActive: { color: COLORS.primary, fontWeight: '700' },
+
+  vibeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  vibeOptionBtn: { backgroundColor: COLORS.background, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1, borderColor: COLORS.border },
+  vibeOptionBtnActive: { backgroundColor: COLORS.text, borderColor: COLORS.text },
+  vibeOptionText: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary },
+  vibeOptionTextActive: { color: COLORS.surface, fontWeight: '700' },
+
+  generateEventBtn: { flexDirection: 'row', backgroundColor: COLORS.accent, paddingVertical: 18, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginTop: 30, gap: 10, ...SHADOWS.light },
+  generateEventBtnText: { color: COLORS.text, fontSize: 16, fontWeight: '800' }
 });
