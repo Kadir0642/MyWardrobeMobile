@@ -212,7 +212,6 @@ export default function StylistScreen() {
             activeOpacity={0.7}
             onPress={() => navigation.navigate('Planner')} // Yönlendirme (Route adının Navigator'da 'Planner' olduğundan emin ol)
           >
-          >
 
             {/* TAKVİM İKONU */}
             <MaterialCommunityIcons

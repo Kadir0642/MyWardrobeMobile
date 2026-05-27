@@ -1,20 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, TextInput, Dimensions, ActivityIndicator, ImageBackground, KeyboardAvoidingView, Platform } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, TextInput, Dimensions, ActivityIndicator, ImageBackground, KeyboardAvoidingView, Platform, Modal } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { apiClient } from '../../api/client';
+import { COLORS } from '../../theme/theme';
 
 const { width, height } = Dimensions.get('window');
-
-// 🎨 VOGUE RUTHLESS MINIMALISM PALETTE
-const VOGUE = {
-  bg: '#FFFFFF',
-  text: '#1A1A1A',
-  secondary: '#717171',
-  border: '#1A1A1A',
-  softBg: '#F9F9F9',
-  line: '#EFEFEF'
-};
 
 const EVENT_TYPES = [
   { id: 'WEDDING', label: 'Wedding / Gala', search: 'luxury+gala+event' },
@@ -35,10 +27,8 @@ export default function EventPlannerScreen() {
   const [customPrompt, setCustomPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // 🚀 DİNAMİK ARKA PLAN MOTORU
   const [bgImage, setBgImage] = useState('https://images.unsplash.com/photo-1511795409834-ef04bbd61622?q=80&w=800&auto=format&fit=crop');
 
-  // Debounced Arkaplan Güncelleme (Sihirli Kutu veya Seçim Değişince)
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       if (customPrompt.trim().length > 3) {
@@ -52,20 +42,39 @@ export default function EventPlannerScreen() {
     return () => clearTimeout(delayDebounceFn);
   }, [customPrompt, selectedEvent]);
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     let finalContext = customPrompt || `${selectedEvent} - ${selectedVibe}`;
     
     setIsLoading(true);
-    // Yapay Zeka Analiz Simülasyonu
-    setTimeout(() => {
+
+    try {
+      const payload = {
+        userId: 1, 
+        mode: 'EVENT',
+        magicContext: finalContext,
+        weatherContext: "Belirtilmedi", 
+        days: 1, 
+        totalOutfits: 3 
+      };
+
+      const response = await apiClient.post('/capsules/generate', payload);
+
       setIsLoading(false);
-      navigation.navigate('EventResultScreen', { eventContext: finalContext });
-    }, 2000);
+      
+      navigation.navigate('EventResultScreen', { 
+        capsuleData: response.data, 
+        eventContext: finalContext 
+      });
+      
+    } catch (error) {
+      setIsLoading(false);
+      console.error("🚨 Etkinlik Kombini Hatası:", error);
+      alert("Kombinler oluşturulurken AI motorunda yoğunluk yaşandı, lütfen tekrar deneyin.");
+    }
   };
 
   return (
     <View style={styles.container}>
-      {/* 🚀 SİNEMATİK BAŞLIK */}
       <ImageBackground source={{ uri: bgImage }} style={styles.heroBackground} imageStyle={{ opacity: 0.85 }}>
         <View style={styles.heroOverlay} />
         
@@ -86,7 +95,6 @@ export default function EventPlannerScreen() {
         </View>
       </ImageBackground>
 
-      {/* 🚀 VOGUE FORM (Tam Ekran Deneyimi) */}
       <View style={styles.formContainer}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView 
@@ -94,10 +102,8 @@ export default function EventPlannerScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-            
             <Text style={styles.formIntroText}>Tell us the social context, and Vestify AI will curate three distinct aesthetic directions for you.</Text>
 
-            {/* OCCASION SELECTION */}
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>The Occasion</Text>
               <View style={styles.grid}>
@@ -113,7 +119,6 @@ export default function EventPlannerScreen() {
               </View>
             </View>
 
-            {/* VIBE SELECTION */}
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>The Impression</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.vibeRow}>
@@ -129,14 +134,13 @@ export default function EventPlannerScreen() {
               </ScrollView>
             </View>
 
-            {/* MAGIC BOX (SİHİRLİ KUTU) */}
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>Or whisper details to AI</Text>
               <View style={styles.inputContainer}>
                 <TextInput 
                   style={styles.input}
                   placeholder="Ex: Rooftop party in Manhattan, want to be the sharpest person in the room..."
-                  placeholderTextColor={VOGUE.secondary}
+                  placeholderTextColor={COLORS.textSecondary}
                   multiline
                   maxLength={150}
                   value={customPrompt}
@@ -148,33 +152,39 @@ export default function EventPlannerScreen() {
               </View>
             </View>
 
-            {/* ACTION BUTTON */}
             <TouchableOpacity 
               style={[styles.mainBtn, (!customPrompt && (!selectedEvent || !selectedVibe)) && styles.disabledBtn]}
               onPress={handleGenerate}
               disabled={isLoading || (!customPrompt && (!selectedEvent || !selectedVibe))}
             >
-              {isLoading ? (
-                <ActivityIndicator color="#FFF" />
-              ) : (
-                <>
-                  <Text style={styles.mainBtnText}>CURATE ALTERNATIVES</Text>
-                  <Feather name="arrow-right" size={20} color="#FFF" />
-                </>
-              )}
+              <Text style={styles.mainBtnText}>{isLoading ? 'CURATING...' : 'CURATE ALTERNATIVES'}</Text>
+              {!isLoading && <Feather name="arrow-right" size={20} color={COLORS.surface} />}
             </TouchableOpacity>
 
           </ScrollView>
         </KeyboardAvoidingView>
       </View>
+      
+      {/* 🚀 LÜKS YAPAY ZEKA BEKLEME EKRANI */}
+      <Modal visible={isLoading} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: 'rgba(248, 246, 240, 0.95)', justifyContent: 'center', alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={COLORS.primary} style={{ transform: [{ scale: 1.5 }] }} />
+            <Text style={{ marginTop: 30, fontSize: 18, fontWeight: '800', color: COLORS.text, letterSpacing: 2 }}>
+                VESTIFY AI TASARLIYOR
+            </Text>
+            <Text style={{ marginTop: 10, fontSize: 14, color: COLORS.textSecondary, fontStyle: 'italic', textAlign: 'center', paddingHorizontal: 40 }}>
+                Seçtiğiniz konsepte uygun 3 farklı stil alternatifi oluşturuluyor...
+            </Text>
+        </View>
+      </Modal>
+
     </View>
   );
-}
+} // FONKSİYONUN BİTİŞİ (Stiller Dışarıda Olmalı)
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: VOGUE.bg },
+  container: { flex: 1, backgroundColor: COLORS.background },
   
-  // CINEMATIC HEADER STYLES
   heroBackground: { width: '100%', height: height * 0.35, justifyContent: 'space-between' },
   heroOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10 },
@@ -183,34 +193,29 @@ const styles = StyleSheet.create({
   heroTextContainer: { paddingHorizontal: 30, paddingBottom: 30 },
   heroMainText: { fontSize: 36, fontWeight: '800', color: '#FFF', letterSpacing: -1 },
 
-  // VOGUE FORM CONTAINER
-  formContainer: { flex: 1, backgroundColor: VOGUE.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, marginTop: -20, overflow: 'hidden' },
+  formContainer: { flex: 1, backgroundColor: COLORS.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, marginTop: -20, overflow: 'hidden' },
   scrollContent: { paddingHorizontal: 30, paddingTop: 30 },
-  formIntroText: { fontSize: 13, color: VOGUE.secondary, lineHeight: 22, marginBottom: 35, fontWeight: '500' },
+  formIntroText: { fontSize: 13, color: COLORS.textSecondary, lineHeight: 22, marginBottom: 35, fontWeight: '500' },
   
   section: { marginBottom: 35 },
-  sectionLabel: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.5, color: VOGUE.text, marginBottom: 15 },
+  sectionLabel: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.5, color: COLORS.text, marginBottom: 15 },
   
-  // TILES STYLES
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  gridItem: { paddingVertical: 12, paddingHorizontal: 18, borderWidth: 1, borderColor: '#EEE', borderRadius: 4 },
-  activeItem: { backgroundColor: VOGUE.text, borderColor: VOGUE.text },
-  gridLabel: { fontSize: 13, fontWeight: '600', color: VOGUE.text },
-  activeLabel: { color: VOGUE.bg },
+  gridItem: { paddingVertical: 12, paddingHorizontal: 18, borderWidth: 1, borderColor: COLORS.border, borderRadius: 4, backgroundColor: COLORS.surface },
+  activeItem: { backgroundColor: COLORS.text, borderColor: COLORS.text },
+  gridLabel: { fontSize: 13, fontWeight: '600', color: COLORS.text },
+  activeLabel: { color: COLORS.surface },
   
-  // VIBE PILLS
   vibeRow: { gap: 10 },
-  vibeBtn: { paddingVertical: 10, paddingHorizontal: 20, backgroundColor: VOGUE.softBg, borderRadius: 24, borderWidth: 1, borderColor: '#F0F0F0' },
-  activeVibeBtn: { backgroundColor: VOGUE.text, borderColor: VOGUE.text },
-  vibeText: { fontSize: 12, fontWeight: '700', color: VOGUE.secondary },
-  activeVibeText: { color: VOGUE.bg },
+  vibeBtn: { paddingVertical: 10, paddingHorizontal: 20, backgroundColor: COLORS.surface, borderRadius: 24, borderWidth: 1, borderColor: COLORS.border },
+  activeVibeBtn: { backgroundColor: COLORS.text, borderColor: COLORS.text },
+  vibeText: { fontSize: 12, fontWeight: '700', color: COLORS.textSecondary },
+  activeVibeText: { color: COLORS.surface },
   
-  // MAGIC BOX STYLES
-  inputContainer: { backgroundColor: VOGUE.softBg, padding: 20, minHeight: 120, borderLeftWidth: 3, borderLeftColor: VOGUE.text, borderRadius: 4 },
-  input: { fontSize: 14, color: VOGUE.text, fontWeight: '500', textAlignVertical: 'top', lineHeight: 20 },
+  inputContainer: { backgroundColor: COLORS.surface, padding: 20, minHeight: 120, borderLeftWidth: 3, borderLeftColor: COLORS.primary, borderRadius: 4, borderWidth: 1, borderColor: COLORS.border },
+  input: { fontSize: 14, color: COLORS.text, fontWeight: '500', textAlignVertical: 'top', lineHeight: 20 },
   
-  // MAIN BUTTON
-  mainBtn: { flexDirection: 'row', backgroundColor: VOGUE.text, height: 70, alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 10, borderRadius: 4 },
-  mainBtnText: { color: VOGUE.bg, fontSize: 13, fontWeight: '900', letterSpacing: 2 },
-  disabledBtn: { opacity: 0.1 }
+  mainBtn: { flexDirection: 'row', backgroundColor: COLORS.text, height: 70, alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 10, borderRadius: 8 },
+  mainBtnText: { color: COLORS.surface, fontSize: 13, fontWeight: '900', letterSpacing: 2 },
+  disabledBtn: { opacity: 0.4 } 
 });

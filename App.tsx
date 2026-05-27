@@ -15,7 +15,7 @@ import OutfitDetailScreen from './src/screens/OutfitDetailScreen';
 import TravelPlannerScreen from './src/screens/wardrobe/TravelPlannerScreen';
 
 // Mevcut Kapsül Ekranı
-import CapsuleResultScreen from './src/screens/wardrobe/CapsuleResultScreen';
+import TravelResultScreen from './src/screens/wardrobe/TravelResultScreen';
 
 // Etkinlik Sonuç Ekranı projeye dahil edildi
 import EventResultScreen from './src/screens/wardrobe/EventResultScreen';
@@ -97,10 +97,10 @@ export default function App() {
               options={{ presentation: 'card', headerShown: false }} 
             />
 
-            {/* 5. KAT: Kapsül Sonuç Ekranımız */}
+            {/* 5. KAT: Capsule/Travel Sonuç Ekranımız */}
             <Stack.Screen 
-              name="CapsuleResultScreen" 
-              component={CapsuleResultScreen} 
+              name="TravelResultScreen" 
+              component={TravelResultScreen} 
               options={{ presentation: 'card', headerShown: false }} 
             />
 
