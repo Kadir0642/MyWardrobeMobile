@@ -385,9 +385,9 @@ const styles = StyleSheet.create({
 
   dayText: {
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '700',
 
-    color: '#1A1A1A',
+    color: '#6E6E6E',
 
     letterSpacing: 0.3,
   },
