@@ -33,8 +33,14 @@ const SUBCATEGORY_OPTIONS = [
   'Tote Bag', 'Crossbody Bag', 'Clutch', 'Backpack', 'Messenger Bag', 'Shoulder Bag', 'Beanie', 'Fedora', 'Baseball Cap', 'Sun Hat', 'Sunglasses', 'Aviator Glasses', 'Belt', 'Silk Scarf', 'Winter Scarf', 'Leather Gloves', 'Watch', 'Necklace', 'Pendant', 'Bracelet', 'Ring', 'Hoop Earrings', 'Stud Earrings', 'Tie', 'Bow Tie'
 ];
 
+// Beden Seçenekleri (3 Ayrı Kategoriye Ayrıldı)
 const CLOTHING_SIZE_OPTIONS = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Oversize', 'One Size'];
-const FOOTWEAR_SIZE_OPTIONS = ['30', '31','32', '33','34', '35','36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46', '47','48', '49', '50'];
+
+// DİNAMİK LİSTE: 30'dan 50'ye kadar olan sayıları otomatik oluşturur (30, 31, 32... 50)
+const FOOTWEAR_SIZE_OPTIONS = Array.from({ length: 21 }, (_, i) => (30 + i).toString()); 
+
+//  Aksesuarlar için özel liste
+const ACCESSORY_SIZE_OPTIONS = ['One Size', 'Adjustable'];
 
 const mapToOption = (dbValue: string | undefined | null, optionsArray: string[]) => {
   if (!dbValue) return null;
@@ -126,7 +132,10 @@ export default function ItemDetailScreen({ route, navigation }: any) {
       case 'subCategory': return SUBCATEGORY_OPTIONS;
       case 'size': 
         // DİNAMİK BEDEN: Eğer Kategori Ayakkabı ise numaraları, değilse tekstil bedenlerini göster!
-        return category === 'Footwear' ? FOOTWEAR_SIZE_OPTIONS : CLOTHING_SIZE_OPTIONS;
+        //Kategoriye göre doğru beden listesini ver
+        if(category == 'Footwear') return FOOTWEAR_SIZE_OPTIONS;
+        if(category == 'Accessories') return ACCESSORY_SIZE_OPTIONS;
+        return CLOTHING_SIZE_OPTIONS;
       default: return [];
     }
   };
@@ -147,7 +156,7 @@ export default function ItemDetailScreen({ route, navigation }: any) {
       subCategory: subCategory !== 'Select Sub-Category' ? subCategory.toUpperCase() : null, 
       size: size !== 'Select Size' ? size : null,
       name: sanitizeInput(name),
-      color: apiColorString, 
+      color: apiColorNames, 
       season: selectedSeasons.length > 0 ? selectedSeasons[0] : 'ALL_SEASON', 
     };
 
