@@ -3,7 +3,7 @@ import { StyleSheet, Text, View, TouchableOpacity, Image, Modal, ScrollView, Dim
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import PremiumToast from '../PremiumToast';
-import { apiClient } from '../../api/client';
+import { apiClient, sendOutfitFeedback, OutfitFeedbackPayload } from '../../api/client';
 import { COLORS, SHADOWS } from '../../theme/theme'; 
 
 const { width, height } = Dimensions.get('window');
@@ -129,22 +129,28 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
     })
   ).current;
 
-  const sendFeedbackToAPI = async (feedbackType: string, reasonCode: string, targetIds: number[]) => {
+  const sendFeedbackToAPI = async (feedbackType: 'LIKE' | 'DISLIKE', reasonCode: string, targetIds: number[]) => {
      const outfitIds = Object.values(suggestedItems).map(item => parseInt(item.id, 10)).filter(id => !isNaN(id));
      if(outfitIds.length === 0) return;
 
-     const payload = {
-       user_id: CURRENT_USER_ID, 
-       outfit_item_ids: outfitIds, 
-       feedback_type: feedbackType, 
-       reason_code: reasonCode,     
-       target_item_ids: targetIds, 
-       weather_context: weather ? `${weather.city}, ${weather.temp}` : "UNKNOWN"
+     // Hava durumu verisi varsa kullan (Örn: "Kastamonu, 15°C"), yoksa UNKNOWN yolla.
+     // Python'daki "İklim Beyni" bu string'i alıp vektör matematiğine dönüştürecek!
+     const contextString = weather ? `${weather.city}, ${weather.temp}` : "UNKNOWN";
+
+     const payload: OutfitFeedbackPayload = {
+       userId: CURRENT_USER_ID, 
+       outfitItemIds: outfitIds, 
+       feedbackType: feedbackType, 
+       reasonCode: reasonCode as any,     
+       targetItemIds: targetIds.length > 0 ? targetIds : outfitIds, // Hedef yoksa tüm kombini cezalandır/ödüllendir
+       weatherContext: contextString
      };
 
      try {
-       await apiClient.post('/feedback', payload);
-     } catch (error) {}
+       await sendOutfitFeedback(payload);
+     } catch (error) {
+       console.log("Feedback error", error);
+     }
   };
 
   const handleReasonSelect = (reasonId: string) => {
@@ -169,6 +175,7 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
     setSelectedTargetItems(prev => prev.includes(numId) ? prev.filter(i => i !== numId) : [...prev, numId]);
   };
 
+  // LİKE tuşuda AI'ı eğitecek
   const handleLike = () => {
     Animated.sequence([
       Animated.timing(likeScale, { toValue: 1.4, duration: 150, useNativeDriver: true }),
@@ -177,10 +184,18 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
       const outfitIds = Object.values(suggestedItems).map(item => parseInt(item.id, 10)).filter(id => !isNaN(id));
       if(outfitIds.length > 0) {
           try {
-             await apiClient.post(`/outfits/${CURRENT_USER_ID}/save`, { name: `AI Match - ${new Date().toLocaleDateString('tr-TR')}`, clothingItemIds: outfitIds });
+            // 1. Kombini Kullanıcının Dolabına (Veritabanına) Kaydet
+             await apiClient.post(`/outfits/${CURRENT_USER_ID}/save`, { name: `AI Suggest - ${new Date().toLocaleDateString('tr-TR')}`, clothingItemIds: outfitIds });
+             
+             // AI'A "BEN BUNU BEĞENDİM" SİNYALİ GÖNDER!
+             // Pozitif DNA profili bu kombine doğru kayacak.
+             await sendFeedbackToAPI('LIKE', 'NONE', outfitIds);
+             
              setToastVisible(true);
              fetchOutfitFromAPI(dynamicSlots);
-          } catch(e) {}
+          } catch(e) {
+            console.error("Like işlemi sırasında hata:", e);
+          }
       }
     });
   };
