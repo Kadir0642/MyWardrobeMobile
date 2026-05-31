@@ -54,8 +54,10 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
     setIsLoading(true);
     try {
       const requestedCategories = currentSlots.map(s => s.category).join(',');
-      const response = await apiClient.get(`/outfits/suggest?userId=${CURRENT_USER_ID}&categories=${requestedCategories}`);
-      
+      const response = await apiClient.get(`/outfits/suggest?userId=${CURRENT_USER_ID}&categories=${requestedCategories}`); // Orjinal HALİ
+      //const response = await apiClient.get(`/outfits/suggest?userId=${CURRENT_USER_ID}&categories=${requestedCategories}&weatherContext=Kastamonu, -5°C Karlı`); // Kış testi
+      //const response = await apiClient.get(`/outfits/suggest?userId=${CURRENT_USER_ID}&categories=${requestedCategories}&weatherContext=Antalya, 35°C Güneşli`); //Yaz testi
+
       if (response.status === 200 && Array.isArray(response.data)) {
         const newSuggested: any = {};
         let availableItems = [...response.data];
@@ -67,16 +69,14 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
             );
 
             if (matchIndex !== -1) {
-                const matched = availableItems[matchIndex];
-                newSuggested[slot.id] = {
-                    id: matched.id?.toString() || matched.clothingId?.toString(),
-                    uri: matched.imageUrl || matched.uri,
-                    category: matched.category,
-                    // Not: Java DTO güncellendiğinde burası gerçek marka dolacak.
-                    brand: matched.brand || "VESTIFY" 
-                };
-                availableItems.splice(matchIndex, 1); 
-            } 
+                  const matched = availableItems[matchIndex];
+                  // DÜZELTME: Sadece ID ve URI değil, tüm objeyi kaydediyoruz!
+                  newSuggested[slot.id] = {
+                      ...matched, // Tüm veriyi kopyala
+                      uri: matched.imageUrl || matched.uri, // Arayüz için resmi garantiye al
+                  };
+                  availableItems.splice(matchIndex, 1); 
+              } 
         });
         setSuggestedItems(newSuggested);
       }
@@ -135,7 +135,10 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
 
      // Hava durumu verisi varsa kullan (Örn: "Kastamonu, 15°C"), yoksa UNKNOWN yolla.
      // Python'daki "İklim Beyni" bu string'i alıp vektör matematiğine dönüştürecek!
-     const contextString = weather ? `${weather.city}, ${weather.temp}` : "UNKNOWN";
+     
+     const contextString = weather ? `${weather.city}, ${weather.temp}` : "UNKNOWN"; // ORJİNAL HALİ
+     //const contextString = "Kastamonu, -5°C Karlı";// KIŞ TESTİ
+     //const contextString = "Anltalya, 35°C Güneşli";// YAZ TESTİ
 
      const payload: OutfitFeedbackPayload = {
        userId: CURRENT_USER_ID, 
@@ -200,12 +203,11 @@ export default function AISuggestionsTab({ allWardrobe = [], weather }: AISugges
     });
   };
 
-  // 🚀 DÜZELTME: Kıyafet Detay Sayfasına Gitme (Hata Giderildi)
+// DÜZELTİLECEK YER 2: navigateToItemDetail Fonksiyonu
   const navigateToItemDetail = (item: any) => {
-    if (!item || !item.uri) return;
+    if (!item) return;
     navigation.navigate('ItemDetail', { 
-        id: item.id, // Sayfanın çökmemesi için ID de yolluyoruz
-        imageUrl: item.uri, 
+        item: item, // Kıyafetin tüm verisini paket yapıp yolluyoruz
         isAiGenerated: true 
     });
   };

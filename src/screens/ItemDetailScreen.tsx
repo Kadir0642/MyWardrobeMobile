@@ -21,22 +21,25 @@ const AI_COLOR_MAP: Record<string, string> = {
   "silver": "#D3D3D3", "gold": "#B8860B", "multicolor": "#808080" 
 };
 
-// 🚀 Zenginleştirilmiş listelerimiz buraya da yansıdı!
+// 🚀 Python Worker ve Java Enum'ları ile %100 Uyumlu Genişletilmiş Seçenekler
 const CATEGORY_OPTIONS = ['Outerwear', 'Tops', 'Bottoms', 'Footwear', 'Accessories', 'Full Body'];
 
 const SUBCATEGORY_OPTIONS = [
-  'T-Shirt', 'Shirt', 'Blouse', 'Sweater', 'Cardigan', 'Hoodie', 'Sweatshirt', 'Tank top',
-  'Jacket', 'Coat', 'Trench coat', 'Blazer', 'Vest', 'Poncho',
-  'Pants', 'Jeans', 'Sweatpants', 'Leggings', 'Shorts', 'Skirt',
-  'Dress', 'Jumpsuit', 'Romper', 'Suit',
-  'Sneakers', 'Boots', 'Sandals', 'Heels', 'Loafers', 'Slippers', 'Formal shoes',
-  'Hat', 'Cap', 'Beanie', 'Watch', 'Sunglasses', 'Glasses',
-  'Bag', 'Backpack', 'Purse', 'Wallet', 'Belt', 'Scarf', 'Gloves', 'Necklace', 'Ring', 'Earrings', 'Tie'
+  'T-Shirt', 'Polo Shirt', 'Button-Down Shirt', 'Blouse', 'Crop Top', 'Tank Top', 'Camisole', 'Turtleneck', 'Sweater', 'Cardigan', 'Hoodie', 'Sweatshirt', 'Tunic',
+  'Denim Jacket', 'Leather Jacket', 'Bomber Jacket', 'Puffer Jacket', 'Windbreaker', 'Trench Coat', 'Overcoat', 'Blazer', 'Vest', 'Poncho', 'Cape',
+  'Jeans', 'Chinos', 'Cargo Pants', 'Sweatpants', 'Joggers', 'Leggings', 'Tailored Pants', 'Palazzo Pants', 'Shorts', 'Bermuda Shorts', 'Mini Skirt', 'Midi Skirt', 'Maxi Skirt', 'Pleated Skirt',
+  'Maxi Dress', 'Midi Dress', 'Mini Dress', 'Evening Gown', 'Jumpsuit', 'Romper', 'Tailored Suit', 'Tuxedo',
+  'Sneakers', 'Running Shoes', 'Ankle Boots', 'Knee-High Boots', 'Combat Boots', 'Sandals', 'Flip-Flops', 'High Heels', 'Pumps', 'Wedges', 'Loafers', 'Oxfords', 'Ballet Flats',
+  'Tote Bag', 'Crossbody Bag', 'Clutch', 'Backpack', 'Messenger Bag', 'Shoulder Bag', 'Beanie', 'Fedora', 'Baseball Cap', 'Sun Hat', 'Sunglasses', 'Aviator Glasses', 'Belt', 'Silk Scarf', 'Winter Scarf', 'Leather Gloves', 'Watch', 'Necklace', 'Pendant', 'Bracelet', 'Ring', 'Hoop Earrings', 'Stud Earrings', 'Tie', 'Bow Tie'
 ];
 
-// Kullanıcının ilerideki pazaryeri için sadece BEDEN seçmesini bıraktık
-const SIZE_OPTIONS = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Oversize', 'One Size'];
+const CLOTHING_SIZE_OPTIONS = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Oversize', 'One Size'];
+const FOOTWEAR_SIZE_OPTIONS = ['30', '31','32', '33','34', '35','36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46', '47','48', '49', '50'];
 
+const mapToOption = (dbValue: string | undefined | null, optionsArray: string[]) => {
+  if (!dbValue) return null;
+  return optionsArray.find(opt => opt.toLowerCase() === dbValue.toLowerCase()) || dbValue;
+};
 
 const guessParentCategory = (subCat: string) => {
   const s = subCat.toLowerCase();
@@ -52,36 +55,32 @@ const guessParentCategory = (subCat: string) => {
 export default function ItemDetailScreen({ route, navigation }: any) {
   const insets = useSafeAreaInsets();
   
-  // 🚀 TİP GÜVENLİĞİ: Gelen öğenin ClothingItem tipinde olduğunu biliyoruz
-  const item: ClothingItem = route.params?.item;
+  // 🚀 SEÇENEK A KORUMASI: Gönderilen tüm kıyafet verisini eksiksiz alıyoruz
+  const item: ClothingItem = route.params?.item || {};
+  const itemId = item.id;
+  const itemImage = item.imageUrl || route.params?.imageUrl;
 
   const [isSaving, setIsSaving] = useState(false);
-
   const [modalVisible, setModalVisible] = useState(false);
   const [modalType, setModalType] = useState<'category' | 'subCategory' | 'size'>('category');
 
   const sanitizeInput = (text: string) => text.replace(/[<>{}\\]/g, ''); 
 
-  // 1. Kategori Formatlama
-  let initCategory = item.category || CATEGORY_OPTIONS[0];
-  let initSubCategory = item.subCategory || 'Select Sub-Category';
-  
-  const isAICategory = SUBCATEGORY_OPTIONS.some(sub => sub.toLowerCase() === initCategory.toLowerCase());
-  if (isAICategory) {
-    initSubCategory = initCategory.charAt(0).toUpperCase() + initCategory.slice(1); 
-    initCategory = guessParentCategory(initSubCategory); 
-  }
+  // 1. Akıllı Kategori / Alt Kategori Eşleme
+  let initCategory = mapToOption(item.category, CATEGORY_OPTIONS) || CATEGORY_OPTIONS[0];
+  let initSubCategory = mapToOption(item.subCategory, SUBCATEGORY_OPTIONS) || 'Select Sub-Category';
+  let initSize = item.size || 'Select Size'; // Beden doğrudan veritabanından gelsin
 
-  // 2. Renk Formatlama
+  // 🚀 2. GÜVENLİ RENK FORMATLAMA: Büyük/küçük harf uyuşmazlığı tamamen giderildi (Bütün Hex kodları UPPERCASE yapıldı)
   const initialColors: string[] = [];
   if (item.color) {
     const rawColors = item.color.toLowerCase().split(',');
     rawColors.forEach((rc: string) => {
       const cleanColor = rc.trim();
       if (AI_COLOR_MAP[cleanColor]) {
-        initialColors.push(AI_COLOR_MAP[cleanColor]); 
+        initialColors.push(AI_COLOR_MAP[cleanColor].toUpperCase()); 
       } else if (cleanColor.includes('#')) {
-        initialColors.push(cleanColor); 
+        initialColors.push(cleanColor.toUpperCase()); 
       }
     });
   }
@@ -89,19 +88,24 @@ export default function ItemDetailScreen({ route, navigation }: any) {
   // 3. Sezon Formatlama
   const initialSeasons = item.season && item.season !== 'BELIRTILMEDI' 
     ? item.season.toUpperCase().split(',').map((s: string) => s.trim()) 
-    : ['SPRING', 'SUMMER', 'AUTUMN', 'WINTER']; // Hepsi seçili gelsin
-  
+    : ['SPRING', 'SUMMER', 'AUTUMN', 'WINTER'];
+
   // --- STATE TANIMLAMALARI ---
   const [brand, setBrand] = useState(item.brand || '');
   const [category, setCategory] = useState(initCategory);
   const [subCategory, setSubCategory] = useState(initSubCategory);
-  const [size, setSize] = useState(item.size || 'Select Size'); 
+  const [size, setSize] = useState(initSize); 
   const [name, setName] = useState(item.name || item.brand || 'Vestify Item');
   
   const [selectedColors, setSelectedColors] = useState<string[]>(initialColors);
   const [selectedSeasons, setSelectedSeasons] = useState<string[]>(initialSeasons);
 
-  const toggleColor = (color: string) => setSelectedColors(prev => prev.includes(color) ? prev.filter(c => c !== color) : [...prev, color]);
+  // Renk seçiminde harf hassasiyetini sıfırlayan güvenli tetikleyici
+  const toggleColor = (color: string) => {
+    const upperColor = color.toUpperCase();
+    setSelectedColors(prev => prev.includes(upperColor) ? prev.filter(c => c !== upperColor) : [...prev, upperColor]);
+  };
+  
   const toggleSeason = (season: string) => setSelectedSeasons(prev => prev.includes(season) ? prev.filter(s => s !== season) : [...prev, season]);
   
   const openPicker = (type: 'category' | 'subCategory' | 'size') => {
@@ -120,26 +124,35 @@ export default function ItemDetailScreen({ route, navigation }: any) {
     switch(modalType) {
       case 'category': return CATEGORY_OPTIONS;
       case 'subCategory': return SUBCATEGORY_OPTIONS;
-      case 'size': return SIZE_OPTIONS;
+      case 'size': 
+        // DİNAMİK BEDEN: Eğer Kategori Ayakkabı ise numaraları, değilse tekstil bedenlerini göster!
+        return category === 'Footwear' ? FOOTWEAR_SIZE_OPTIONS : CLOTHING_SIZE_OPTIONS;
       default: return [];
     }
   };
 
   const handleSave = async () => {
     setIsSaving(true);
+
+    // CRITICAL FIX: Seçilen Hex kodunu tekrar İngilizce text ismine çeviriyoruz (Örn: "#0000FF" -> "BLUE")
+    // Böylece Java Backend, Python Tagger ve Vektör DNA motoru veriyi hatasız okumaya devam edecek!
+    const apiColorNames = selectedColors.map(hex => {
+      const found = Object.entries(AI_COLOR_MAP).find(([_, h]) => h.toUpperCase() === hex.toUpperCase());
+      return found ? found[0].toUpperCase() : hex.toUpperCase();
+    }).join(',');
+
     const updatedData = {
       brand: sanitizeInput(brand),
-      category: category.toUpperCase(), // Backend'deki Enum ve stringlerle uyumlu olsun diye
+      category: category.toUpperCase(), 
       subCategory: subCategory !== 'Select Sub-Category' ? subCategory.toUpperCase() : null, 
       size: size !== 'Select Size' ? size : null,
       name: sanitizeInput(name),
-      color: selectedColors.join(','), 
-      season: selectedSeasons.length > 0 ? selectedSeasons[0] : 'ALL_SEASON', // Şimdilik ilk sezonu yolluyoruz
+      color: apiColorString, 
+      season: selectedSeasons.length > 0 ? selectedSeasons[0] : 'ALL_SEASON', 
     };
 
     try {
-      // 🚀 AXIOS İLE TEMİZ KAYIT (Aynı zamanda Spring Boot endpointine uyumlu hale getireceğiz)
-      const response = await apiClient.put(`/clothes/${item.id}`, updatedData);
+      const response = await apiClient.put(`/clothes/${itemId}`, updatedData);
 
       if (response.status === 200 || response.status === 204) {
         Alert.alert("Başarılı! 🌿", "Kıyafet bilgileri güncellendi.");
@@ -155,7 +168,6 @@ export default function ItemDetailScreen({ route, navigation }: any) {
     }
   };
 
-  // Silme İşlemi (Çöp Kutusu Butonu İçin)
   const handleDelete = async () => {
     Alert.alert(
       "Kıyafeti Sil",
@@ -168,9 +180,8 @@ export default function ItemDetailScreen({ route, navigation }: any) {
           onPress: async () => {
             try {
               setIsSaving(true);
-              // Java tarafındaki deleteClothingItem endpointi çağrılıyor (Soft delete)
-              await apiClient.delete(`/clothes/${item.id}`);
-              navigation.goBack(); // Sildikten sonra dolaba dön
+              await apiClient.delete(`/clothes/${itemId}`);
+              navigation.goBack(); 
             } catch (error) {
               Alert.alert("Hata", "Kıyafet silinemedi.");
               setIsSaving(false);
@@ -210,11 +221,8 @@ export default function ItemDetailScreen({ route, navigation }: any) {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
           
           <View style={styles.imageContainer}>
-            {/* 🚀 IMAGE_URL DÜZELTİLDİ */}
-            <Image source={{ uri: item.imageUrl }} style={styles.itemImage} />
+            <Image source={{ uri: itemImage }} style={styles.itemImage} />
           </View>
-
-          {/* SEKME SEÇİCİ TAMAMEN KALDIRILDI! Sadece form kaldı. */}
 
           <View style={styles.formContainer}>
             
@@ -256,7 +264,7 @@ export default function ItemDetailScreen({ route, navigation }: any) {
               <Text style={styles.inputLabel}>COLOR</Text>
               <View style={styles.colorGrid}>
                 {COLOR_PALETTE.map((c, idx) => {
-                  const isSelected = selectedColors.includes(c);
+                  const isSelected = selectedColors.includes(c.toUpperCase());
                   return (
                     <TouchableOpacity key={idx} onPress={() => toggleColor(c)} style={[styles.colorBox, { backgroundColor: c }, c === '#FFFFFF' && { borderWidth: 1, borderColor: '#DDD' }, isSelected && styles.colorBoxSelected]}>
                       {isSelected && <Feather name="check" size={16} color={c === '#FFFFFF' || c === '#FFFF00' ? '#000' : '#FFF'} />}
@@ -288,7 +296,6 @@ export default function ItemDetailScreen({ route, navigation }: any) {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* LÜKS AÇILIR MENÜ AYNI KALDI */}
       <Modal visible={modalVisible} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -316,7 +323,6 @@ export default function ItemDetailScreen({ route, navigation }: any) {
           </View>
         </View>
       </Modal>
-
     </View>
   );
 }
