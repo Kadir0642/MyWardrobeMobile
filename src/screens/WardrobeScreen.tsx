@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Animated, Dimensions, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Animated, Dimensions, Alert, ScrollView, Modal } from 'react-native';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -40,6 +40,9 @@ export default function WardrobeScreen({ navigation }: any) {
   const [numColumns, setNumColumns] = useState(2);
   const [newItemIds, setNewItemIds] = useState<number[]>([]);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'completed'>('idle');
+
+  // Yükleme Seçenek Menüsü (Modal) için state | state ekrandaki verileri tutan dinamik hafıza
+  const [isUploadMenuVisible, setIsUploadMenuVisible] = useState(false);
   
   const loadingProgress = useRef(new Animated.Value(0)).current;
 
@@ -80,16 +83,27 @@ export default function WardrobeScreen({ navigation }: any) {
 
   const barWidth = loadingProgress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
-  const pickAndUploadImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, allowsMultipleSelection: true, selectionLimit: 5, quality: 0.8 });
+  // Kıyafet ekleme yerimiz
+  // Artık dışarıdan 'flat_lay' veya 'on_body' modunu alıyor
+  const pickAndUploadImage = async (uploadMode: 'flat_lay' | 'on_body') => {
+    
+    setIsUploadMenuVisible(false); // Modalı kapat
+    
+    let result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, allowsMultipleSelection: true, selectionLimit: 5, quality: 0.8 }); // Seçim sayısını ve kalite ayarı 
+    
     if (!result.canceled && result.assets.length > 0) {
       setUploadStatus('uploading'); 
       let successCount = 0; 
       const existingIdsBeforeUpload = new Set(items.map(i => i.id));
+      
       for (let i = 0; i < result.assets.length; i++) {
         const imageUri = result.assets[i].uri;
         const formData = new FormData();
         formData.append('image', { uri: imageUri, name: `wardrobe_item_${i}.jpg`, type: 'image/jpeg' } as any);
+        
+        // Yapay zekaya (Python) çalışma modunu fısıldıyoruz
+        formData.append('mode', uploadMode);
+
         try {
           const extractResponse = await apiClient.post(`/clothes/${currentUserId}/ai-extract`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
           if (extractResponse.status === 202 || extractResponse.status === 200) {
@@ -231,10 +245,44 @@ export default function WardrobeScreen({ navigation }: any) {
       </View>
 
       {mainTab === 'ITEMS' && (
-        <TouchableOpacity style={styles.aiUploadButton} activeOpacity={0.9} onPress={pickAndUploadImage}>
+        <TouchableOpacity 
+          style={styles.aiUploadButton} 
+          activeOpacity={0.9} 
+          onPress={() => setIsUploadMenuVisible(true)} // Tıklayınca direkt galeriyi değil, menüyü aç
+        >
           <Feather name="plus" size={36} color="#E07A5F" />
         </TouchableOpacity>
-      )}    
+      )}   
+
+      {/* 🚀 YENİ: Vogue Stili Fotoğraf Yükleme Seçim Menüsü */}
+      <Modal visible={isUploadMenuVisible} transparent={true} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>How are you uploading?</Text>
+              <TouchableOpacity onPress={() => setIsUploadMenuVisible(false)} hitSlop={{top:20, bottom:20, left:20, right:20}}>
+                <Feather name="x" size={24} color="#1A1A1A" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.uploadOptionsContainer}>
+              <TouchableOpacity style={styles.uploadOptionCard} onPress={() => pickAndUploadImage('flat_lay')}>
+                <MaterialCommunityIcons name="tshirt-crew-outline" size={36} color="#6A5ACD" />
+                <Text style={styles.uploadOptionTitle}>Flat-Lay</Text>
+                <Text style={styles.uploadOptionSub}>Items placed on a flat surface like a bed or table.</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.uploadOptionCard} onPress={() => pickAndUploadImage('on_body')}>
+                <MaterialCommunityIcons name="mirror-rectangle" size={36} color="#E07A5F" />
+                <Text style={styles.uploadOptionTitle}>On-Body</Text>
+                <Text style={styles.uploadOptionSub}>Items extracted directly from a selfie or mirror photo.</Text>
+              </TouchableOpacity>
+            </View>
+
+          </View>
+        </View>
+      </Modal>
+      
 
     </View>
   );
@@ -267,5 +315,18 @@ const styles = StyleSheet.create({
 
   floatingControls: { position: 'absolute', bottom: 100, right: 20, alignItems: 'flex-end', gap: 12, zIndex: 100 },
   gridToggleBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4 },
-  aiUploadButton: { position: 'absolute', bottom: 30, right: 20, width: 64, height: 64, borderRadius: 32, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#E07A5F', justifyContent: 'center', alignItems: 'center', shadowColor: '#E07A5F', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 }
+  
+  // 🚀 VİRGÜL HATASI BURADA DÜZELTİLDİ:
+  aiUploadButton: { position: 'absolute', bottom: 30, right: 20, width: 64, height: 64, borderRadius: 32, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#E07A5F', justifyContent: 'center', alignItems: 'center', shadowColor: '#E07A5F', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
+
+  // 🚀 EKSİK MODAL STİLLERİ EKLENDİ:
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#F5F2EB', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 40 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderColor: '#D1CFC7' },
+  modalTitle: { fontSize: 16, fontWeight: '700', color: '#1A1A1A' },
+
+  uploadOptionsContainer: { padding: 20, gap: 15 },
+  uploadOptionCard: { flexDirection: 'column', alignItems: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EBE8DF', borderRadius: 12, padding: 20, gap: 10 },
+  uploadOptionTitle: { fontSize: 16, fontWeight: '700', color: '#1A1A1A' },
+  uploadOptionSub: { fontSize: 13, color: '#888', textAlign: 'center', lineHeight: 18, paddingHorizontal: 10 }
 });
